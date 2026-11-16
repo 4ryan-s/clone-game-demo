@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real or Clone?</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <ol class="steps" id="steps" aria-label="Progress">
+    <li data-step="consent">Consent</li>
+    <li data-step="record">Your voice</li>
+    <li data-step="making">Making copies</li>
+    <li data-step="game">Spot the real one</li>
+    <li data-step="result">Result</li>
+  </ol>
+
+  <!-- 1. consent -->
+  <section class="step" id="step-consent" hidden>
+    <h1 id="consent-title"></h1>
+    <p class="lede" id="consent-intro"></p>
+    <ul class="points" id="consent-points"></ul>
+    <label class="check"><input type="checkbox" id="agree"><span id="agree-label"></span></label>
+    <label class="check"><input type="checkbox" id="retain"><span id="retain-label"></span></label>
+    <p class="error" id="consent-error" role="alert" hidden></p>
+    <button class="primary" id="consent-go" disabled>I agree, continue</button>
+  </section>
+
+  <!-- 2. record -->
+  <section class="step" id="step-record" hidden>
+    <h1>Read this sentence out loud</h1>
+    <p class="sentence" id="sentence"></p>
+    <div class="meter" aria-hidden="true"><div class="meter-bar" id="meter-bar"></div></div>
+    <p class="timer" id="timer">0.0 s</p>
+    <div class="row">
+      <button class="primary" id="rec-btn">Start recording</button>
+    </div>
+    <div id="review" hidden>
+      <p class="captured"><span class="tick" aria-hidden="true">&#10003;</span> Recording captured (<span id="review-len"></span>)</p>
+      <div class="row">
+        <button class="primary" id="use-btn">Use this recording</button>
+        <button id="again-btn">Record again</button>
+      </div>
+    </div>
+    <p class="hint" id="record-hint">Hold the microphone close and speak at a normal pace. Press stop when you finish.</p>
+    <p class="error" id="record-error" role="alert" hidden></p>
+  </section>
+
+  <!-- 3. making -->
+  <section class="step" id="step-making" hidden>
+    <h1>Making copies of your voice</h1>
+    <p class="lede">Each system is listening to your recording and saying the same sentence in your voice.</p>
+    <ul class="progress" id="progress"></ul>
+    <p class="error" id="making-error" role="alert" hidden></p>
+    <button id="retry-btn" hidden>Try again</button>
+  </section>
+
+  <!-- 4. game -->
+  <section class="step" id="step-game" hidden>
+    <h1>Which one is really you?</h1>
+    <p class="lede">All three say the same sentence. One is your own recording, the others are copies made by AI voice systems. Listen to each, then pick the real one.</p>
+    <div class="cards" id="cards"></div>
+    <p class="error" id="game-error" role="alert" hidden></p>
+    <div class="row">
+      <button class="primary" id="confirm-btn" disabled>Choose a voice first</button>
+    </div>
+  </section>
+
+  <!-- 5. result -->
+  <section class="step" id="step-result" hidden>
+    <div class="verdict" id="verdict"><h1 id="result-title"></h1><p class="lede" id="result-text"></p></div>
+    <div class="cards" id="result-cards"></div>
+    <p class="hint" id="result-note"></p>
+    <div class="row">
+      <button id="delete-btn">Delete my data</button>
+      <button class="primary" id="finish-btn">Finish</button>
+    </div>
+    <p class="hint" id="finish-note"></p>
+    <p class="hint">Session code: <strong id="code"></strong></p>
+  </section>
+
+  <section class="step" id="step-bye" hidden>
+    <h1 id="bye-title"></h1>
+    <p class="lede" id="bye-text"></p>
+    <button class="primary" id="restart-btn">Start again</button>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
