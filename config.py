@@ -1,8 +1,22 @@
-"""Settings for the clone-spotting demo. Everything that is likely to change on demo day lives here."""
+"""Settings for the clone-spotting demo. Everything that is likely to change on demo day lives here.
+
+Paths are relative to this folder, so a fresh clone works after `python setup.py`. To point at models or environments that
+already exist on one machine, create `local_config.py` next to this file (git ignores it) and assign any name from this file.
+"""
+import os
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 SESSIONS_DIR = ROOT / "data" / "sessions"
+MODELS_DIR = ROOT / "models"       # downloaded by setup.py (not in git: several GB)
+VENVS_DIR = ROOT / ".venvs"        # one Python environment per local engine, created by setup.py
+THIRD_PARTY_DIR = ROOT / "third_party"
+
+
+def venv_python(name: str) -> str:
+    return str(VENVS_DIR / name / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python"))
+
 
 # The fixed sentence every participant reads, and every clone speaks.
 # PLACEHOLDER: pick the final one with the sentence test (10 to 15 words, reads in about 5 s).
@@ -15,27 +29,42 @@ MIN_RMS_DBFS = -45.0       # quieter than this is rejected as "too quiet"
 MAX_CLIPPED_FRACTION = 0.01
 
 # Cloning engines, in slot order. A new engine is one file in engines/ plus its name here.
-# Cards shown to the user = 1 real + one per engine, so 3 cards now; the game supports up to 4 (3 engines).
-ENGINES = ["sarvam", "cosyvoice"]
+# Cards shown to the user = 1 real + one per engine, so three engines give four cards.
+ENGINES = ["sarvam", "cosyvoice", "qwen3tts"]
 MAX_ENGINES = 3
 
 # Names shown on the reveal screen, after the participant has picked.
-ENGINE_LABELS = {"sarvam": "Sarvam", "cosyvoice": "CosyVoice 2"}
+ENGINE_LABELS = {"sarvam": "Sarvam", "cosyvoice": "CosyVoice 2", "qwen3tts": "Qwen3-TTS"}
 
-# The clone check (see scoring.py). Margin below CUTOFF = called a clone. The model is read from the banking backend folder, read-only.
-SPECTRA_BACKEND = Path("C:/Users/aryan/josh_voice_banking/backend/voice-banking-backend-pad-spectra")
+# The clone check (see scoring.py). Margin below CUTOFF = called a clone.
 CUTOFF = 6.0
+SPECTRA_ONNX = Path(os.environ.get("SPECTRA_ONNX", MODELS_DIR / "spectra_aasist3.onnx"))
 
 # Playback only: every card is trimmed to the same lead/tail silence and set to the same loudness, so level and silence give nothing away.
 PLAY_TARGET_RMS_DBFS = -23.0
 PLAY_PAD_SECONDS = 0.2
 
-COSYVOICE_URL ="http://127.0.0.1:8765"
-COSYVOICE_PYTHON = "D:/clone_detection_tests/.venvs/cosyvoice/Scripts/python.exe"
+# Local engines. Each runs as a small always-on worker in its own environment and keeps its model loaded on the GPU.
+COSYVOICE_URL = "http://127.0.0.1:8765"
+COSYVOICE_PYTHON = venv_python("cosyvoice")
+COSYVOICE_REPO = THIRD_PARTY_DIR / "CosyVoice"
+COSYVOICE_MODEL_DIR = MODELS_DIR / "CosyVoice2-0.5B"
 COSYVOICE_TIMEOUT_S = 120
+
+QWEN_URL = "http://127.0.0.1:8766"
+QWEN_PYTHON = venv_python("qwen")
+QWEN_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"        # Hugging Face id, downloaded into MODELS_DIR/hf by setup.py
+QWEN_TIMEOUT_S = 120
+
+HF_HOME = MODELS_DIR / "hf"
 SARVAM_TIMEOUT_S = 90
 
 # Shown on the consent page as the person to contact to delete a recording. Leave empty to say "ask the demo host".
 CONTACT = ""
 
 CONSENT_VERSION = "draft-1"   # bump whenever the consent wording changes; stored with every session
+
+try:                           # machine-specific overrides (paths to models and environments that already exist here)
+    from local_config import *  # noqa: F401,F403
+except ImportError:
+    pass
