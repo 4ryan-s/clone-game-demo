@@ -1,0 +1,10 @@
+# Demo API: python -m uvicorn server:app --host 127.0.0.1 --port 8000
+# The CosyVoice worker (workers/cosyvoice_server.py) stays in its own environment.
+fastapi==0.163.1
+uvicorn==0.54.0
+python-multipart==0.0.33
+numpy==2.5.5
+scipy==1.18.1
+soundfile==0.14.0
+requests==2.34.2
+onnxruntime==1.32.0
