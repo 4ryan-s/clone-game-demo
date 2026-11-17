@@ -32,10 +32,10 @@ export function GameStep({ cardIds, player, onLock }) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+    <div className="mx-auto flex w-full max-w-4xl flex-col">
       <StepHead title="Which one is you?" />
 
-      <div className="mx-auto mt-6 grid w-full max-w-4xl grid-cols-2 gap-5">
+      <div className="mt-7 grid w-full grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
         {cardIds.map((id, index) => (
           <div key={id} className="rise" style={{ animationDelay: `${index * 70}ms` }}>
             <VoiceCard
@@ -51,9 +51,9 @@ export function GameStep({ cardIds, player, onLock }) {
         ))}
       </div>
 
-      <footer className="mt-5 flex flex-col items-center gap-3">
+      <footer className="mt-7 flex flex-col items-center gap-3">
         <ErrorNote>{error}</ErrorNote>
-        <Button primary className="min-w-52" disabled={!picked || busy} onClick={lock}>
+        <Button primary className="w-full max-w-xs sm:w-auto sm:min-w-52" disabled={!picked || busy} onClick={lock}>
           {busy ? "Checking…" : picked ? "Lock in" : "Pick a voice"}
         </Button>
       </footer>

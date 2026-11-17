@@ -27,7 +27,7 @@ export function VoiceCard({ letter, playing, progress, onPlay, selected, onPick,
       <div className={cx("flex items-center", reveal ? "justify-between text-left" : "flex-col")}>
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">Voice</p>
-          <h2 className={cx("font-display leading-none", reveal ? "text-4xl" : "text-5xl")}>{letter}</h2>
+          <h2 className={cx("font-display leading-none", reveal ? "text-3xl sm:text-4xl" : "text-4xl sm:text-5xl")}>{letter}</h2>
         </div>
         {reveal && (
           <PlayButton letter={letter} playing={playing} onPlay={onPlay} size="h-14 w-14" icon="h-6 w-6" />
@@ -53,8 +53,8 @@ export function VoiceCard({ letter, playing, progress, onPlay, selected, onPick,
               {reveal.real ? "Your real voice" : `Clone: ${reveal.who}`}
             </span>
             <p className="mt-2 min-h-5 text-sm text-muted">{reveal.picked ? "You picked this one" : "\u00a0"}</p>
-            <div className="mt-1 flex items-end justify-between gap-3">
-              <p className="font-display text-4xl leading-none tabular-nums">{formatMargin(reveal.margin)}</p>
+            <div className="mt-1 flex flex-wrap items-end justify-between gap-2">
+              <p className="font-display text-3xl leading-none tabular-nums sm:text-4xl">{formatMargin(reveal.margin)}</p>
               <p className="pb-1 text-sm text-muted">{reveal.saysClone ? "Called a clone" : "Passed as real"}</p>
             </div>
             <div

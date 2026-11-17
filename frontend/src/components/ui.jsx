@@ -31,7 +31,7 @@ export function ErrorNote({ children }) {
 
 export function StepHead({ title }) {
   return (
-    <h1 className="text-center font-display text-4xl leading-tight text-balance text-ink">{title}</h1>
+    <h1 className="text-center font-display text-3xl leading-tight text-balance text-ink sm:text-4xl">{title}</h1>
   );
 }
 

@@ -74,7 +74,7 @@ export function MakingStep({ sid, onReady }) {
   }
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col items-center justify-center text-center">
+    <div className="mx-auto flex w-full max-w-xl flex-col items-center text-center">
       {!failed && <span className="spinner spin h-16 w-16 rounded-full" aria-hidden="true" />}
       <div className={failed ? "" : "mt-8"}>
         <StepHead title={failed ? "Not ready yet" : "Hang on"} />
