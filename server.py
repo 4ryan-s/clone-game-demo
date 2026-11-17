@@ -1,7 +1,8 @@
 """Clone-spotting demo: API + the static page.   Run:  python -m uvicorn server:app --port 8000   (see start_demo.ps1)
 
-Phase 1 (this file): consent -> recording -> clones made by every engine -> status.
-Not built yet: the four-card listening game, the pick, and the reveal with the clone-check scores.
+Consent -> recording -> clones made by every engine -> cards, pick and reveal with the clone-check scores.
+Data: a session folder is working data and is deleted when the session ends. A recording is kept (numbered, with its
+session id) in data/voice_samples/ only if the participant ticked the optional box (see voicebank.py).
 """
 import logging
 import os
@@ -21,6 +22,7 @@ import game
 import pipeline
 import scoring
 import store
+import voicebank
 from consent import CONSENT
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -33,9 +35,9 @@ DEBUG = os.environ.get("DEMO_DEBUG") == "1"
 async def lifespan(_app):
     config.SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
     scoring.warm_up()          # loads the 1.2 GB clone-check model in the background so the reveal is quick
-    n = store.purge_unconsented()
+    n = store.purge_stale()
     if n:
-        log.info("purged %d old sessions without retention consent", n)
+        log.info("removed %d unfinished working sessions older than 24 h", n)
     yield
 
 
@@ -90,6 +92,15 @@ async def upload_recording(sid: str, file: UploadFile = File(...)):
         d = store.path(sid)
         audio.write_wav(d / "original.wav", x)
         store.write(sid, "recording.json", {**verdict, "browser_sample_rate": sr, "at": time.time()})
+        consent = store.read(sid, "consent.json", {})
+        if consent.get("retain"):
+            # Agreed to keep it: copy into the numbered voice bank now, so it is not lost if they close the tab before Finish.
+            # A re-record replaces the earlier take under the same number. No agreement: nothing is copied anywhere.
+            try:
+                voicebank.save(sid, d / "original.wav", consent.get("version", ""), verdict["seconds"])
+            except OSError as exc:
+                log.error("could not save the voice sample for %s: %s", sid, exc)
+                raise HTTPException(500, "Your recording could not be saved. Please try again.")
         for stale in ("clones", "raw", "meta.json"):          # a re-record starts the clones over
             p = d / stale
             if p.is_dir():
@@ -154,20 +165,26 @@ def pick(sid: str, body: PickIn):
 
 @app.post("/api/sessions/{sid}/finish")
 def finish(sid: str):
-    """Called when the participant is done. Deletes everything unless they ticked the retention box."""
+    """Called when the participant is done. The working session (clones, scores, everything but the voice bank) is always
+    deleted. `kept` says whether their own recording stays in the voice bank because they agreed to that."""
     _need(sid)
-    if store.read(sid, "consent.json", {}).get("retain"):
-        return {"deleted": False}
+    kept = bool(store.read(sid, "consent.json", {}).get("retain"))
     store.delete(sid)
-    return {"deleted": True}
+    return {"deleted": not kept, "kept": kept}
 
 
 @app.delete("/api/sessions/{sid}")
 def delete_session(sid: str):
-    """The participant (or the host) asks for the data to be removed, retention consent or not."""
-    _need(sid)
+    """The participant (or the host) asks for their data to be removed, using the session code. Removes the working
+    session if it still exists and the saved recording in the voice bank. Works after Finish too."""
+    if not store.valid_id(sid):
+        raise HTTPException(404, "Unknown session code")
+    had_session = store.exists(sid)
+    removed = voicebank.delete_for_session(sid)
+    if not had_session and not removed:
+        raise HTTPException(404, "Unknown session code")
     store.delete(sid)
-    return {"deleted": True}
+    return {"deleted": True, "sample_deleted": bool(removed)}
 
 
 @app.get("/api/health")

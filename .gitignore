@@ -9,3 +9,4 @@ frontend/dist/
 local_config.py
 models/
 .venvs/
+third_party/

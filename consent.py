@@ -8,14 +8,15 @@ import config
 CONSENT = {
     "version": config.CONSENT_VERSION,
     "title": "Can you tell a real voice from a clone?",
-    "intro": "You will read one sentence out loud. We will then make copies of your voice with three different systems, "
+    "intro": "You will read one sentence out loud. We will then make copies of your voice with voice-cloning systems, "
              "mix them with your real recording, and ask you to spot the real one. Then we will show how our system tells them apart.",
     "points": [
-        "Your voice is personal data. We record you reading one sentence, about five seconds.",
-        "Two voice-cloning systems copy your voice. One runs on this computer. The other, Sarvam, is an outside company: "
-        "your recording and the sentence are sent to Sarvam over the internet to create its copy.",
+        "Your voice is personal data. We record you reading one short sentence.",
+        "Two voice-cloning systems make three copies of your voice. One, Qwen3-TTS, runs on this computer. The other, Sarvam, is an outside company: "
+        "your recording and the sentence are sent to Sarvam over the internet to create its two copies.",
         "Nothing else about you is collected. We do not ask for your name. You get a session code.",
-        "You can stop at any point. If you do not tick the second box below, your recording and the copies are deleted when you finish.",
+        "You can stop at any point. The copies are always deleted when you finish. If you do not tick the second box below, "
+        "your own recording is deleted too. If you do tick it, only your own recording is kept.",
         "You can ask for your data to be deleted later with your session code" +
         (f" by contacting {config.CONTACT}." if config.CONTACT else ". Ask the demo host how."),
     ],
@@ -25,7 +26,7 @@ CONSENT = {
     },
     "optional": {
         "id": "retain",
-        "label": "Optional: you may keep my recording and the copies, and use them to train and test our voice-fraud detection. "
-                 "They will be stored without my name and will not be shared outside the company.",
+        "label": "Optional: you may keep my own recording, and use it to train and test our voice-fraud detection. "
+                 "It will be stored without my name, filed under a number and my session code, and will not be shared outside the company.",
     },
 }

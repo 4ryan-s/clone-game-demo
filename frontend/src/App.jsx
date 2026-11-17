@@ -105,7 +105,7 @@ export default function App() {
         title: "Thank you",
         text: done.deleted
           ? "Your recording and the copies have been deleted."
-          : "Your session is saved. Keep your code if you want it deleted later.",
+          : "Your recording is saved without your name. The copies have been deleted. Keep your session code if you want your recording deleted later.",
       });
     } catch (err) {
       setBye({ title: "Thank you", text: err.message });

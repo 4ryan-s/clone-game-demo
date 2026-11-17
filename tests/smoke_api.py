@@ -1,6 +1,8 @@
 """End-to-end check of phase 1 against a running server: consent -> bad recording rejected -> good recording ->
 clones from every engine -> status -> files on disk -> finish/delete.   python tests/smoke_api.py <reference.wav> [base_url]
-Needs DEMO_DEBUG=1 on the server only for the optional file fetch at the end."""
+Needs DEMO_DEBUG=1 on the server only for the optional file fetch at the end.
+Note: it saves (then deletes) one sample in data/voice_samples/, so it uses up sample number 0 of that folder.
+Run it before real participants, then delete data/voice_samples/ so real numbering starts at 0; never run it on a live server."""
 import io
 import sys
 import time
@@ -66,7 +68,34 @@ for i in range(1, st["total"] + 1):
     info = sf.info(os.path.join(d, f"clones/c{i}.wav"))
     check(info.samplerate == 16000 and info.channels == 1 and info.duration > 1.5, f"c{i}.wav is 16 kHz mono, {info.duration:.1f} s")
 
-check(requests.post(f"{base}/api/sessions/{sid}/finish").json()["deleted"] is False, "retention consent given: finish keeps the data")
-check(requests.delete(f"{base}/api/sessions/{sid}").json()["deleted"], "explicit delete removes it")
-check(not os.path.exists(d), "session folder is gone")
+bank = os.path.join(os.path.dirname(d), "..", "voice_samples")
+
+
+def bank_rows():
+    import csv
+    p = os.path.join(bank, "index.csv")
+    return list(csv.DictReader(open(p, newline="", encoding="utf-8"))) if os.path.exists(p) else []
+
+
+mine = [r for r in bank_rows() if r["session_id"] == sid]
+check(len(mine) == 1 and mine[0]["status"] == "saved", f"consented recording was saved as sample number {mine[0]['index'] if mine else '?'}")
+sample = os.path.join(bank, f"{int(mine[0]['index']):06d}.wav")
+check(os.path.isfile(sample) and sf.info(sample).samplerate == 16000, "numbered wav exists (16 kHz)")
+fin = requests.post(f"{base}/api/sessions/{sid}/finish").json()
+check(fin == {"deleted": False, "kept": True}, "finish: working session removed, recording kept because they agreed")
+check(not os.path.exists(d) and os.path.isfile(sample), "session folder is gone, the saved sample is still there")
+gone = requests.delete(f"{base}/api/sessions/{sid}").json()
+check(gone["deleted"] and gone["sample_deleted"], "deletion by session code works after Finish and removes the sample")
+check(not os.path.exists(sample) and [r["status"] for r in bank_rows() if r["session_id"] == sid] == ["deleted"], "file removed, index row marked deleted")
+check(requests.delete(f"{base}/api/sessions/{sid}").status_code == 404, "deleting again says unknown session code")
+
+# a participant who did NOT agree to keep their recording: nothing is saved anywhere, everything is deleted at Finish
+before = len(bank_rows())
+sid2 = requests.post(base + "/api/sessions", json={"agree": True, "retain": False, "version": cfg["consent"]["version"]}).json()["session_id"]
+v2 = requests.post(f"{base}/api/sessions/{sid2}/recording", files={"file": ("r.wav", wav_bytes(x, sr), "audio/wav")}).json()
+check(v2["ok"] and len(bank_rows()) == before and not any(r["session_id"] == sid2 for r in bank_rows()), "no consent: nothing added to the voice bank")
+d2 = os.path.join(os.path.dirname(d), sid2)
+check(os.path.isfile(os.path.join(d2, "original.wav")), "working copy exists while the session runs")
+check(requests.post(f"{base}/api/sessions/{sid2}/finish").json() == {"deleted": True, "kept": False}, "finish: everything deleted")
+check(not os.path.exists(d2) and len(bank_rows()) == before, "no consent: session folder gone, voice bank unchanged")
 print("ALL PASSED")
