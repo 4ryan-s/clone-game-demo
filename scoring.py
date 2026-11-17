@@ -1,28 +1,26 @@
 """The clone check: Spectra-AASIST3, same preparation as the banking login (pre-emphasis on), RAW 16 kHz audio, no codec.
 Margin = log-odds of "real" over "clone". Below config.CUTOFF the clip is called a clone.
-Reuses the banking backend's prepare_wav and ONNX model by path (config.SPECTRA_BACKEND), read-only; nothing is copied or changed there."""
-import sys
+The model file is config.SPECTRA_ONNX (models/spectra_aasist3.onnx, put there by setup.py)."""
 import threading
 
 import numpy as np
+import onnxruntime as ort
 
 import config
+import spectra_prep
 
 _lock = threading.Lock()
 _sess = None
-_prepare = None
 _ready = threading.Event()
 _error = None
 
 
 def _load():
-    global _sess, _prepare, _error
+    global _sess, _error
     try:
-        sys.path.insert(0, str(config.SPECTRA_BACKEND))
-        from voiceprint.utils.pad_scorer import prepare_wav
-        import onnxruntime as ort
-        _prepare = prepare_wav
-        _sess = ort.InferenceSession(str(config.SPECTRA_BACKEND / "model" / "spectra_aasist3.onnx"), providers=["CPUExecutionProvider"])
+        if not config.SPECTRA_ONNX.is_file():
+            raise FileNotFoundError(f"{config.SPECTRA_ONNX} is missing. Run `python setup.py` or set SPECTRA_ONNX.")
+        _sess = ort.InferenceSession(str(config.SPECTRA_ONNX), providers=["CPUExecutionProvider"])
     except Exception as exc:  # noqa: BLE001
         _error = str(exc)
     finally:
@@ -40,7 +38,7 @@ def margin(x: np.ndarray) -> float:
     _ready.wait()
     if _sess is None:
         raise RuntimeError(f"The clone check could not be loaded: {_error}")
-    w = _prepare(x, 16000, use_preemphasis=True)
+    w = spectra_prep.prepare_wav(x)
     with _lock:
         logits = _sess.run(["logits"], {"wav": w[None, :].astype(np.float32)})[0][0]
     return float(logits[1] - logits[0])

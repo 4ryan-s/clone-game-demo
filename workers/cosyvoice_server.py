@@ -11,8 +11,13 @@ import sys
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-REPO = "D:/clone_detection_tests/tools/CosyVoice"
-PORT = int(os.environ.get("COSYVOICE_PORT", "8765"))
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import config  # noqa: E402
+
+REPO = config.COSYVOICE_REPO.as_posix()
+PORT = int(os.environ.get("COSYVOICE_PORT", config.COSYVOICE_URL.rsplit(":", 1)[1]))
 os.chdir(REPO)
 sys.path.append(REPO)
 sys.path.append(REPO + "/third_party/Matcha-TTS")
@@ -23,7 +28,7 @@ from cosyvoice.cli.cosyvoice import AutoModel  # noqa: E402
 
 print("loading CosyVoice2-0.5B ...", flush=True)
 t0 = time.time()
-MODEL = AutoModel(model_dir=REPO + "/pretrained_models/CosyVoice2-0.5B")
+MODEL = AutoModel(model_dir=config.COSYVOICE_MODEL_DIR.as_posix())
 print(f"ready in {time.time() - t0:.0f}s, cuda={torch.cuda.is_available()}, sample_rate={MODEL.sample_rate}", flush=True)
 
 

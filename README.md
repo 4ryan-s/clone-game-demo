@@ -15,6 +15,22 @@ You need Python 3.11 or later, and Node.js 20 or later for the React quiz.
 
 ## Setup
 
+### Quick path (any laptop)
+
+```bash
+python setup.py              # creates the environments and downloads Qwen3-TTS and CosyVoice 2 (about 20 GB)
+python setup.py --check      # shows what is installed and what is missing
+```
+
+- No NVIDIA GPU (a Mac, for example): `python setup.py --cpu`. It works but is much slower.
+- The models are downloaded, not stored in git: Qwen3-TTS from Hugging Face (`Qwen/Qwen3-TTS-12Hz-0.6B-Base`), CosyVoice 2 from Hugging Face (`FunAudioLLM/CosyVoice2-0.5B`), both into `models/`.
+- The clone-check model (Spectra-AASIST3, 1.2 GB) is not public. Put it at `models/spectra_aasist3.onnx`, or run `python setup.py --spectra-from <file>`, or set `SPECTRA_URL` (and `SPECTRA_TOKEN` if the link needs one).
+- Already have models or environments on this machine? Create `local_config.py` (git ignores it) and set the same names as in `config.py`, for example `HF_HOME`, `QWEN_PYTHON`, `COSYVOICE_PYTHON`, `SPECTRA_ONNX`.
+- Start everything: `.\start_demo.ps1` (Windows) or `./start_demo.sh` (Mac/Linux).
+- Memory: three engines plus the clone check need about 16 GB of RAM free-ish and 8 GB of video memory. Close browsers and other heavy apps before a live session.
+
+The steps below are the same thing by hand.
+
 ### 1. Python API
 
 From the project root:
@@ -33,11 +49,9 @@ Set the Sarvam key in the environment. It is never logged or stored.
 export SARVAM_API_KEY=your-key     # Windows: setx SARVAM_API_KEY "your-key"
 ```
 
-Before a real session, point these paths in `config.py` at this machine:
+The clone check no longer needs the banking repo: `spectra_prep.py` holds the input preparation (checked identical to the backend's own, `tests/parity_prepare_wav.py`) and `assets/silero_vad.onnx` the speech detector. Only the Spectra model file is needed (`config.SPECTRA_ONNX`).
 
-- `SPECTRA_BACKEND` — voice-banking backend folder that contains `model/spectra_aasist3.onnx` and `voiceprint.utils.pad_scorer`. The server only reads it.
-- `COSYVOICE_PYTHON` — Python executable of the existing CosyVoice environment.
-- `COSYVOICE_URL` — local worker, default `http://127.0.0.1:8765`.
+Paths in `config.py` default to folders inside the project (`models/`, `.venvs/`, `third_party/`). Local engine workers: CosyVoice at `http://127.0.0.1:8765`, Qwen3-TTS at `http://127.0.0.1:8766`.
 
 `config.SENTENCE`, `config.CONTACT`, and the wording in `consent.py` are still placeholders.
 
@@ -86,7 +100,7 @@ python tests/smoke_api.py path/to/a-reference.wav
 
 Consent, then record the sentence (raw, 16 kHz mono), then a quality check. Sarvam and CosyVoice 2 make copies at the same time. The cards are shuffled: play, pick, win or lose, then the clone-check score for each voice.
 
-Cards = 1 real + one per engine. Two engines now, so 3 cards. A third engine adds the 4th card.
+Cards = 1 real + one per engine. Three engines (Sarvam, CosyVoice 2, Qwen3-TTS), so 4 cards.
 
 ## Layout
 
@@ -96,7 +110,8 @@ Cards = 1 real + one per engine. Two engines now, so 3 cards. A third engine add
 - `requirements.txt` Python packages for that API.
 - `frontend/` React quiz (Vite, Tailwind). Light mode, full desktop.
 - `engines/` one file per cloning engine. To add one: new file, add to `REGISTRY` in `engines/__init__.py`, add its name to `config.ENGINES`.
-- `workers/cosyvoice_server.py` keeps CosyVoice loaded on the GPU. Runs in the existing CosyVoice venv.
+- `workers/cosyvoice_server.py` and `workers/qwen3tts_server.py` keep the local models loaded on the GPU, each in its own environment under `.venvs/`.
+- `setup.py` one-command setup and download of the models. `local_config.py` (not in git) overrides paths on one machine.
 - `static/` the original page (plain HTML, CSS and JS, no build step).
 - `data/sessions/<id>/` per participant: `consent.json`, `original.wav`, `raw/` (engine output untouched), `clones/` (16 kHz), `meta.json`.
 
@@ -112,4 +127,4 @@ Cards = 1 real + one per engine. Two engines now, so 3 cards. A third engine add
 
 - One participant at a time on the GPU worker (a second queues).
 - Raw capture turns the browser's noise suppression, echo cancellation and auto gain off, so a noisy room is audible in the clip.
-- The clone check and CosyVoice paths in `config.py` are still the Windows demo-machine paths until you change them.
+- Not yet tried from a fresh machine: `setup.py` was checked with `--check` and `--dry-run` only. The CosyVoice install is the most fragile part (needs Python 3.10).
