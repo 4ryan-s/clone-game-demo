@@ -55,40 +55,26 @@ Paths in `config.py` default to folders inside the project (`models/`, `.venvs/`
 
 `config.SENTENCE`, `config.CONTACT`, and the wording in `consent.py` are still placeholders.
 
-### 2. React quiz
+### 2. React quiz (the demo page)
 
 ```bash
 cd frontend
 npm install
+npm run build        # the API serves frontend/dist at http://localhost:8000
 ```
 
-The dev server proxies `/api` to `http://127.0.0.1:8000`. The page cannot load the quiz until the API is running.
+`python setup.py` does this for you. While changing the page, `npm run dev` gives hot reload at http://127.0.0.1:5173 (it proxies `/api` to the API on port 8000).
 
 ## Run
 
-Two terminals.
-
-```bash
-# API, from the project root, with .venv active
-python -m uvicorn server:app --host 127.0.0.1 --port 8000
+```
+.\start_demo.ps1            # Windows: starts the engine workers, then the API and the quiz at http://localhost:8000
+.\start_demo.ps1 -Debug     # same, plus the developer file fetch route
+./start_demo.sh             # Mac/Linux
 ```
 
-```bash
-# Quiz
-cd frontend
-npm run dev
-```
-
-Open http://127.0.0.1:5173 . Use a browser on the same computer: browsers only allow the microphone on localhost or https.
-
-On the Windows demo machine, `start_demo.ps1` starts the CosyVoice worker and then the API:
-
-```
-.\start_demo.ps1            # http://localhost:8000
-.\start_demo.ps1 -Debug     # same, plus ?dev=1 to fetch generated files
-```
-
-The API also serves the original page from `static/` at http://127.0.0.1:8000 . The React app is the full-desktop quiz.
+Open http://localhost:8000 . Use a browser on the same computer: browsers only allow the microphone on localhost or https.
+The first plain-HTML page is still served at http://localhost:8000/classic as a fallback.
 
 End-to-end API check, with the server already running:
 
@@ -98,7 +84,7 @@ python tests/smoke_api.py path/to/a-reference.wav
 
 ## What the quiz does
 
-Consent, then record the sentence (raw, 16 kHz mono), then a quality check. Sarvam and CosyVoice 2 make copies at the same time. The cards are shuffled: play, pick, win or lose, then the clone-check score for each voice.
+Consent, then record the sentence (raw, 16 kHz mono), then a quality check. Sarvam, CosyVoice 2 and Qwen3-TTS make copies at the same time. The cards are shuffled: play, pick, win or lose, then the clone-check score for each voice.
 
 Cards = 1 real + one per engine. Three engines (Sarvam, CosyVoice 2, Qwen3-TTS), so 4 cards.
 
@@ -106,7 +92,7 @@ Cards = 1 real + one per engine. Three engines (Sarvam, CosyVoice 2, Qwen3-TTS),
 
 - `config.py` sentence, limits, which engines run, URLs. Everything that changes on demo day.
 - `consent.py` consent wording (DRAFT, needs sign-off) and its version, stored with every session.
-- `server.py` API and the original static page. `pipeline.py` runs the engines at the same time.
+- `server.py` API, the built React quiz at `/` and the original static page at `/classic`. `pipeline.py` runs the engines at the same time.
 - `requirements.txt` Python packages for that API.
 - `frontend/` React quiz (Vite, Tailwind). Light mode, full desktop.
 - `engines/` one file per cloning engine. To add one: new file, add to `REGISTRY` in `engines/__init__.py`, add its name to `config.ENGINES`.

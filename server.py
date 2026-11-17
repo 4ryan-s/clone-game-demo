@@ -191,4 +191,11 @@ if DEBUG:
         return FileResponse(f)
 
 
-app.mount("/", StaticFiles(directory=config.ROOT / "static", html=True), name="static")
+# The React quiz (frontend/, built into frontend/dist) is the demo page. The first plain-HTML page stays at /classic as a fallback.
+app.mount("/classic", StaticFiles(directory=config.ROOT / "static", html=True), name="classic")
+_DIST = config.ROOT / "frontend" / "dist"
+if _DIST.is_dir():
+    app.mount("/", StaticFiles(directory=_DIST, html=True), name="quiz")
+else:
+    log.warning("frontend/dist is missing: run `python setup.py --only frontend` (or `cd frontend && npm install && npm run build`). Serving the classic page at / instead.")
+    app.mount("/", StaticFiles(directory=config.ROOT / "static", html=True), name="static")

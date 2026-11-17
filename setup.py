@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Set this demo up on a new laptop. Python 3.11+ is enough to start; the models are downloaded, not stored in git.
 
-    python setup.py                  everything (API, Qwen3-TTS, CosyVoice 2, clone-check model)
+    python setup.py                  everything (API, Qwen3-TTS, CosyVoice 2, clone-check model, React quiz build)
     python setup.py --only api,qwen  just some parts: api, qwen, cosyvoice, spectra, frontend
     python setup.py --cpu            no NVIDIA GPU (a Mac, for example): CPU/Apple builds of PyTorch, much slower
     python setup.py --check          show what is installed and what is missing, change nothing
@@ -146,9 +146,10 @@ def part_frontend():
     say("React quiz (frontend/)")
     npm = shutil.which("npm")
     if not npm:
-        print("   npm not found. Install Node.js 20 or later to use the React quiz; the plain page at http://localhost:8000 needs no Node.")
+        print("   npm not found. Install Node.js 20 or later and run this again. Until then the server falls back to the plain page.")
         return
-    run([npm, "install"], cwd=ROOT / "frontend")
+    run([npm, "install", "--no-audit", "--no-fund"], cwd=ROOT / "frontend")
+    run([npm, "run", "build"], cwd=ROOT / "frontend")       # the server serves frontend/dist at http://localhost:8000
 
 
 def check():
@@ -163,13 +164,13 @@ def check():
     mark(Path(config.COSYVOICE_REPO).exists() and Path(config.COSYVOICE_MODEL_DIR).exists(), "CosyVoice code and weights", "python setup.py --only cosyvoice")
     mark(Path(config.SPECTRA_ONNX).is_file(), "clone-check model", "see python setup.py --help")
     mark(bool(os.environ.get("SARVAM_API_KEY")), "Sarvam key in the environment (Windows: also checked in user variables at run time)", "set SARVAM_API_KEY")
-    mark((ROOT / "frontend" / "node_modules").exists(), "React quiz packages (optional)", "python setup.py --only frontend")
+    mark((ROOT / "frontend" / "dist" / "index.html").exists(), "React quiz build (the demo page)", "python setup.py --only frontend (needs Node.js 20+)")
 
 
 def main():
     global ARGS
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--only", default="api,qwen,cosyvoice,spectra")
+    ap.add_argument("--only", default="api,qwen,cosyvoice,spectra,frontend")
     ap.add_argument("--cpu", action="store_true")
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
