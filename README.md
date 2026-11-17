@@ -23,10 +23,10 @@ python setup.py --check      # shows what is installed and what is missing
 ```
 
 - No NVIDIA GPU: `python setup.py --cpu`. It works but is much slower.
-- Mac: Apple Silicon only (PyTorch 2.11 has no Intel-Mac build). Use Python 3.11 or 3.12 (`brew install python@3.12`); the Mac's built-in `python3` is too old. CosyVoice also needs Python 3.10 and a compiler (`xcode-select --install`). Qwen3-TTS runs on the Apple GPU; CosyVoice runs on the CPU and will be slow. Sarvam needs no setup beyond its key, so on a Mac it is the fast path. **None of the Mac path has been run on a real Mac yet.**
-- The models are downloaded, not stored in git: Qwen3-TTS from Hugging Face (`Qwen/Qwen3-TTS-12Hz-0.6B-Base`), the clone-check model from Hugging Face (below), both into `models/`. The optional CosyVoice 2 comes from `FunAudioLLM/CosyVoice2-0.5B`.
+- Mac: Apple Silicon only (PyTorch 2.11 has no Intel-Mac build). Use Python 3.11 or 3.12 (`brew install python@3.12`); the Mac's built-in `python3` is too old. Qwen3-TTS runs on the Apple GPU. Sarvam needs no setup beyond its key, so on a Mac it is the fast path. **None of the Mac path has been run on a real Mac yet.**
+- The models are downloaded, not stored in git: Qwen3-TTS from Hugging Face (`Qwen/Qwen3-TTS-12Hz-0.6B-Base`), the clone-check model from Hugging Face (below), both into `models/`.
 - The clone-check model (Spectra-AASIST3, 1.2 GB, Apache-2.0) is downloaded from Hugging Face (`lab260/Spectra-AASIST3`) into `models/spectra_aasist3.onnx` and checked against its published checksum. Use `--spectra-from <file>` or `SPECTRA_URL` to supply your own copy.
-- Already have models or environments on this machine? Create `local_config.py` (git ignores it) and set the same names as in `config.py`, for example `HF_HOME`, `QWEN_PYTHON`, `COSYVOICE_PYTHON`, `SPECTRA_ONNX`.
+- Already have models or environments on this machine? Create `local_config.py` (git ignores it) and set the same names as in `config.py`, for example `HF_HOME`, `QWEN_PYTHON`, `SPECTRA_ONNX`.
 - Start everything: `.\start_demo.ps1` (Windows) or `./start_demo.sh` (Mac/Linux).
 - Memory: three engines plus the clone check need about 16 GB of RAM free-ish and 8 GB of video memory. Close browsers and other heavy apps before a live session.
 
@@ -42,7 +42,7 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-`.venv/` is gitignored. `requirements.txt` is the demo API only. The CosyVoice worker keeps its own environment (`config.COSYVOICE_PYTHON`).
+`.venv/` is gitignored. `requirements.txt` is the demo API only. The Qwen3-TTS worker keeps its own environment (`config.QWEN_PYTHON`).
 
 Set the Sarvam key in the environment. It is never logged or stored.
 
@@ -52,7 +52,7 @@ export SARVAM_API_KEY=your-key     # Windows: setx SARVAM_API_KEY "your-key"
 
 The clone check no longer needs the banking repo: `spectra_prep.py` holds the input preparation (checked identical to the backend's own, `tests/parity_prepare_wav.py`) and `assets/silero_vad.onnx` the speech detector. Only the Spectra model file is needed (`config.SPECTRA_ONNX`).
 
-Paths in `config.py` default to folders inside the project (`models/`, `.venvs/`, `third_party/`). Local engine workers: CosyVoice at `http://127.0.0.1:8765`, Qwen3-TTS at `http://127.0.0.1:8766`.
+Paths in `config.py` default to folders inside the project (`models/`, `.venvs/`). The Qwen3-TTS worker listens at `http://127.0.0.1:8766`.
 
 `config.SENTENCE`, `config.CONTACT`, and the wording in `consent.py` are still placeholders.
 
@@ -87,7 +87,7 @@ python tests/smoke_api.py path/to/a-reference.wav
 
 Consent, then record the sentence (raw, 16 kHz mono), then a quality check. Sarvam (twice, with different settings) and Qwen3-TTS make copies at the same time. The cards are shuffled: play, pick, win or lose, then the clone-check score for each voice.
 
-Cards = 1 real + one per engine. Three engines (Sarvam, Sarvam with other settings, Qwen3-TTS), so 4 cards. CosyVoice 2 is still in the code as an optional extra (`python setup.py --only cosyvoice`, then add `cosyvoice` to `ENGINES` in `config.py`).
+Cards = 1 real + one per engine. Three engines (Sarvam, Sarvam with other settings, Qwen3-TTS), so 4 cards.
 
 ## Layout
 
@@ -97,7 +97,7 @@ Cards = 1 real + one per engine. Three engines (Sarvam, Sarvam with other settin
 - `requirements.txt` Python packages for that API.
 - `frontend/` React quiz (Vite, Tailwind). Light mode, full desktop.
 - `engines/` one file per cloning engine. To add one: new file, add to `REGISTRY` in `engines/__init__.py`, add its name to `config.ENGINES`.
-- `workers/cosyvoice_server.py` and `workers/qwen3tts_server.py` keep the local models loaded on the GPU, each in its own environment under `.venvs/`.
+- `workers/qwen3tts_server.py` keeps Qwen3-TTS loaded on the GPU, in its own environment under `.venvs/qwen`.
 - `setup.py` one-command setup and download of the models. `local_config.py` (not in git) overrides paths on one machine.
 - `static/` the original page (plain HTML, CSS and JS, no build step).
 - `data/sessions/<id>/` per participant: `consent.json`, `original.wav`, `raw/` (engine output untouched), `clones/` (16 kHz), `meta.json`.
@@ -114,4 +114,4 @@ Cards = 1 real + one per engine. Three engines (Sarvam, Sarvam with other settin
 
 - One participant at a time on the GPU worker (a second queues).
 - Raw capture turns the browser's noise suppression, echo cancellation and auto gain off, so a noisy room is audible in the clip.
-- Not yet tried from a fresh machine: `setup.py` was checked with `--check` and `--dry-run` only. The optional CosyVoice install is the most fragile part (needs Python 3.10).
+- Not yet tried from a fresh machine: `setup.py` was checked with `--check` and `--dry-run` only.

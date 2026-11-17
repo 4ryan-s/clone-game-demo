@@ -2,12 +2,12 @@
 """Set this demo up on a new laptop. Python 3.11+ is enough to start; the models are downloaded, not stored in git.
 
     python setup.py                  the default set (API, Qwen3-TTS, clone-check model, React quiz build)
-    python setup.py --only api,qwen  just some parts: api, qwen, spectra, frontend (cosyvoice is an optional extra: --only cosyvoice)
+    python setup.py --only api,qwen  just some parts: api, qwen, spectra, frontend
     python setup.py --cpu            no NVIDIA GPU (a Mac, for example): CPU/Apple builds of PyTorch, much slower
     python setup.py --check          show what is installed and what is missing, change nothing
     python setup.py --dry-run        print the commands instead of running them
 
-Needs about 8 GB of disk (CosyVoice, if you add it, is about 10 GB more) and an internet connection for the downloads.
+Needs about 8 GB of disk and an internet connection for the downloads.
 The clone-check model (Spectra-AASIST3, 1.2 GB, Apache-2.0) is downloaded from Hugging Face (lab260/Spectra-AASIST3)
 and checked against its published SHA-256. To use a copy you already have, pass `--spectra-from <file>` or set SPECTRA_URL.
 Sarvam needs the SARVAM_API_KEY environment variable; this script never asks for or stores it.
@@ -25,9 +25,6 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 import config  # noqa: E402  (paths and model names live there; local_config.py may override them)
 
-COSYVOICE_COMMIT = "074ca6d"
-COSYVOICE_REPO_URL = "https://github.com/FunAudioLLM/CosyVoice.git"
-COSYVOICE_HF_ID = "FunAudioLLM/CosyVoice2-0.5B"
 SPECTRA_URL = "https://huggingface.co/lab260/Spectra-AASIST3/resolve/main/spectra-aasist3.onnx"   # Apache-2.0, public
 SPECTRA_SHA256 = "5f05c29a01ad80c702b32654db87c2aa6e467c11c67b6d47f2fac873f846cae9"
 ARGS = None
@@ -106,20 +103,6 @@ def part_qwen():
     hf_download(py, config.QWEN_MODEL)
 
 
-def part_cosyvoice():
-    say("CosyVoice 2: environment, code and weights")
-    py = venv_python("cosyvoice")
-    make_venv(ROOT / ".venvs" / "cosyvoice", "3.10")
-    torch_install(py, "2.3.1", "2.3.1", "cu121")
-    pip(py, "-r", ROOT / "requirements" / "cosyvoice.txt")
-    repo = config.COSYVOICE_REPO
-    if not repo.exists():
-        run(["git", "clone", "--recursive", COSYVOICE_REPO_URL, repo])
-        run(["git", "-C", repo, "checkout", COSYVOICE_COMMIT])
-        run(["git", "-C", repo, "submodule", "update", "--init", "--recursive"])
-    hf_download(py, COSYVOICE_HF_ID, config.COSYVOICE_MODEL_DIR)
-
-
 def sha256_of(path):
     import hashlib
     h = hashlib.sha256()
@@ -178,9 +161,6 @@ def check():
     mark(venv_python("qwen").exists() or Path(config.QWEN_PYTHON).exists(), "Qwen3-TTS environment", "python setup.py --only qwen")
     hub = Path(config.HF_HOME) / "hub" / ("models--" + config.QWEN_MODEL.replace("/", "--"))
     mark(hub.exists(), "Qwen3-TTS weights", "python setup.py --only qwen")
-    if "cosyvoice" in config.ENGINES:
-        mark(Path(config.COSYVOICE_PYTHON).exists(), "CosyVoice environment", "python setup.py --only cosyvoice")
-        mark(Path(config.COSYVOICE_REPO).exists() and Path(config.COSYVOICE_MODEL_DIR).exists(), "CosyVoice code and weights", "python setup.py --only cosyvoice")
     mark(Path(config.SPECTRA_ONNX).is_file(), "clone-check model", "see python setup.py --help")
     mark(bool(os.environ.get("SARVAM_API_KEY")), "Sarvam key in the environment (Windows: also checked in user variables at run time)", "set SARVAM_API_KEY")
     mark((ROOT / "frontend" / "dist" / "index.html").exists(), "React quiz build (the demo page)", "python setup.py --only frontend (needs Node.js 20+)")
@@ -199,7 +179,7 @@ def main():
     ARGS = ap.parse_args()
     if ARGS.check:
         return check()
-    parts = {"api": part_api, "qwen": part_qwen, "cosyvoice": part_cosyvoice, "frontend": part_frontend,
+    parts = {"api": part_api, "qwen": part_qwen, "frontend": part_frontend,
              "spectra": lambda: part_spectra(ARGS.spectra_from)}
     for name in ARGS.only.split(","):
         if name not in parts:

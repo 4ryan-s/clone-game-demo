@@ -9,7 +9,6 @@ $py = if (Test-Path .venv\Scripts\python.exe) { ".venv\Scripts\python.exe" } els
 function Get-Setting($name) { (& $py -c "import config; print(config.$name)").Trim() }
 
 $workers = @(
-    @{ name = "CosyVoice"; engine = "cosyvoice"; port = 8765; python = (Get-Setting "COSYVOICE_PYTHON"); script = "workers/cosyvoice_server.py" },
     @{ name = "Qwen3-TTS"; engine = "qwen3tts";  port = 8766; python = (Get-Setting "QWEN_PYTHON");      script = "workers/qwen3tts_server.py" }
 )
 $enabled = (& $py -c "import config; print(' '.join(config.ENGINES))").Split(" ")
