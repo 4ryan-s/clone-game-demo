@@ -22,8 +22,27 @@ os.chdir(REPO)
 sys.path.append(REPO)
 sys.path.append(REPO + "/third_party/Matcha-TTS")
 
+import soundfile as sf  # noqa: E402
 import torch  # noqa: E402
 import torchaudio  # noqa: E402
+
+
+def _load_wav(uri, *args, **kwargs):
+    """torchaudio 2.11 routes load() through TorchCodec, which is not installed here."""
+    data, sample_rate = sf.read(uri, dtype="float32", always_2d=True)
+    return torch.from_numpy(data.T.copy()), sample_rate
+
+
+def _save_wav(uri, src, sample_rate, *args, **kwargs):
+    audio = src.detach().cpu()
+    if audio.dim() == 1:
+        audio = audio.unsqueeze(0)
+    sf.write(uri, audio.transpose(0, 1).numpy(), sample_rate)
+
+
+torchaudio.load = _load_wav
+torchaudio.save = _save_wav
+
 from cosyvoice.cli.cosyvoice import AutoModel  # noqa: E402
 
 print("loading CosyVoice2-0.5B ...", flush=True)
