@@ -2,11 +2,10 @@
 add it to REGISTRY, and add its name to config.ENGINES (at most config.MAX_ENGINES)."""
 import config
 from .base import Engine, EngineError  # noqa: F401
-from .cosyvoice import CosyVoice
 from .qwen3tts import Qwen3TTS
-from .sarvam import Sarvam
+from .sarvam import Sarvam, SarvamVariant
 
-REGISTRY: dict[str, type[Engine]] = {"sarvam": Sarvam, "cosyvoice": CosyVoice, "qwen3tts": Qwen3TTS}
+REGISTRY: dict[str, type[Engine]] = {"sarvam": Sarvam, "sarvam2": SarvamVariant, "qwen3tts": Qwen3TTS}
 
 
 def enabled() -> list[Engine]:

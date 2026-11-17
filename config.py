@@ -33,7 +33,6 @@ _load_env()
 SESSIONS_DIR = ROOT / "data" / "sessions"
 MODELS_DIR = ROOT / "models"       # downloaded by setup.py (not in git: several GB)
 VENVS_DIR = ROOT / ".venvs"        # one Python environment per local engine, created by setup.py
-THIRD_PARTY_DIR = ROOT / "third_party"
 
 
 def venv_python(name: str) -> str:
@@ -52,11 +51,14 @@ MAX_CLIPPED_FRACTION = 0.01
 
 # Cloning engines, in slot order. A new engine is one file in engines/ plus its name here.
 # Cards shown to the user = 1 real + one per engine, so three engines give four cards.
-ENGINES = ["sarvam", "cosyvoice", "qwen3tts"]
+ENGINES = ["sarvam", "sarvam2", "qwen3tts"]
 MAX_ENGINES = 3
 
+# Settings for the second Sarvam clone ("sarvam2"). Form fields of POST /voices/clone, sent as text.
+SARVAM_VARIANT_PARAMS = {"remove_background_noise": "true", "enable_qc": "true", "pace": "0.95"}
+
 # Names shown on the reveal screen, after the participant has picked.
-ENGINE_LABELS = {"sarvam": "Sarvam", "cosyvoice": "CosyVoice 2", "qwen3tts": "Qwen3-TTS"}
+ENGINE_LABELS = {"sarvam": "Sarvam", "sarvam2": "Sarvam (other settings)", "qwen3tts": "Qwen3-TTS"}
 
 # The clone check (see scoring.py). Margin below CUTOFF = called a clone.
 CUTOFF = 6.0
@@ -67,12 +69,6 @@ PLAY_TARGET_RMS_DBFS = -23.0
 PLAY_PAD_SECONDS = 0.2
 
 # Local engines. Each runs as a small always-on worker in its own environment and keeps its model loaded on the GPU.
-COSYVOICE_URL = "http://127.0.0.1:8765"
-COSYVOICE_PYTHON = venv_python("cosyvoice")
-COSYVOICE_REPO = THIRD_PARTY_DIR / "CosyVoice"
-COSYVOICE_MODEL_DIR = MODELS_DIR / "CosyVoice2-0.5B"
-COSYVOICE_TIMEOUT_S = 120
-
 QWEN_URL = "http://127.0.0.1:8766"
 QWEN_PYTHON = venv_python("qwen")
 QWEN_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"        # Hugging Face id, downloaded into MODELS_DIR/hf by setup.py

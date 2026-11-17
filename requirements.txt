@@ -1,5 +1,5 @@
 # Demo API: python -m uvicorn server:app --host 127.0.0.1 --port 8000
-# The CosyVoice worker (workers/cosyvoice_server.py) stays in its own environment.
+# The Qwen3-TTS worker (workers/qwen3tts_server.py) keeps its own environment (.venvs/qwen), made by setup.py.
 fastapi==0.163.1
 uvicorn==0.54.0
 python-multipart==0.0.33

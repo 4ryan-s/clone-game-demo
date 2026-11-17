@@ -16,7 +16,6 @@ start_worker() {  # name engine port python script
   nohup "$4" "$5" > "logs/$2.log" 2>&1 &
   echo "$1 worker starting (about 25 s to load); log: logs/$2.log"
 }
-start_worker CosyVoice cosyvoice 8765 "$(get COSYVOICE_PYTHON)" workers/cosyvoice_server.py
 start_worker Qwen3-TTS qwen3tts 8766 "$(get QWEN_PYTHON)" workers/qwen3tts_server.py
 
 [ "$1" = "--debug" ] && export DEMO_DEBUG=1

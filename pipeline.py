@@ -14,7 +14,7 @@ from engines.base import EngineError
 
 log = logging.getLogger("pipeline")
 # The local GPU worker handles one clone at a time; two participants at once would queue here instead of timing out.
-_locks = {"cosyvoice": threading.Lock(), "qwen3tts": threading.Lock()}
+_locks = {"qwen3tts": threading.Lock()}
 
 
 def start(sid: str) -> None:
