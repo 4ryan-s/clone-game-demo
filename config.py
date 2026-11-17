@@ -30,11 +30,14 @@ MAX_CLIPPED_FRACTION = 0.01
 
 # Cloning engines, in slot order. A new engine is one file in engines/ plus its name here.
 # Cards shown to the user = 1 real + one per engine, so three engines give four cards.
-ENGINES = ["sarvam", "cosyvoice", "qwen3tts"]
+ENGINES = ["sarvam", "sarvam2", "qwen3tts"]     # "cosyvoice" is still available as an extra (needs its own setup)
 MAX_ENGINES = 3
 
+# Settings for the second Sarvam clone ("sarvam2"). Form fields of POST /voices/clone, sent as text.
+SARVAM_VARIANT_PARAMS = {"remove_background_noise": "true", "enable_qc": "true", "pace": "0.95"}
+
 # Names shown on the reveal screen, after the participant has picked.
-ENGINE_LABELS = {"sarvam": "Sarvam", "cosyvoice": "CosyVoice 2", "qwen3tts": "Qwen3-TTS"}
+ENGINE_LABELS = {"sarvam": "Sarvam", "sarvam2": "Sarvam (other settings)", "cosyvoice": "CosyVoice 2", "qwen3tts": "Qwen3-TTS"}
 
 # The clone check (see scoring.py). Margin below CUTOFF = called a clone.
 CUTOFF = 6.0

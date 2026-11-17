@@ -4,9 +4,9 @@ import config
 from .base import Engine, EngineError  # noqa: F401
 from .cosyvoice import CosyVoice
 from .qwen3tts import Qwen3TTS
-from .sarvam import Sarvam
+from .sarvam import Sarvam, SarvamVariant
 
-REGISTRY: dict[str, type[Engine]] = {"sarvam": Sarvam, "cosyvoice": CosyVoice, "qwen3tts": Qwen3TTS}
+REGISTRY: dict[str, type[Engine]] = {"sarvam": Sarvam, "sarvam2": SarvamVariant, "cosyvoice": CosyVoice, "qwen3tts": Qwen3TTS}
 
 
 def enabled() -> list[Engine]:

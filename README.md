@@ -18,13 +18,13 @@ You need Python 3.11 or later, and Node.js 20 or later for the React quiz.
 ### Quick path (any laptop)
 
 ```bash
-python setup.py              # creates the environments and downloads Qwen3-TTS and CosyVoice 2 (about 20 GB)
+python setup.py              # creates the environments and downloads Qwen3-TTS and the clone-check model (about 8 GB)
 python setup.py --check      # shows what is installed and what is missing
 ```
 
 - No NVIDIA GPU: `python setup.py --cpu`. It works but is much slower.
 - Mac: Apple Silicon only (PyTorch 2.11 has no Intel-Mac build). Use Python 3.11 or 3.12 (`brew install python@3.12`); the Mac's built-in `python3` is too old. CosyVoice also needs Python 3.10 and a compiler (`xcode-select --install`). Qwen3-TTS runs on the Apple GPU; CosyVoice runs on the CPU and will be slow. Sarvam needs no setup beyond its key, so on a Mac it is the fast path. **None of the Mac path has been run on a real Mac yet.**
-- The models are downloaded, not stored in git: Qwen3-TTS from Hugging Face (`Qwen/Qwen3-TTS-12Hz-0.6B-Base`), CosyVoice 2 from Hugging Face (`FunAudioLLM/CosyVoice2-0.5B`), both into `models/`.
+- The models are downloaded, not stored in git: Qwen3-TTS from Hugging Face (`Qwen/Qwen3-TTS-12Hz-0.6B-Base`), the clone-check model from Hugging Face (below), both into `models/`. The optional CosyVoice 2 comes from `FunAudioLLM/CosyVoice2-0.5B`.
 - The clone-check model (Spectra-AASIST3, 1.2 GB, Apache-2.0) is downloaded from Hugging Face (`lab260/Spectra-AASIST3`) into `models/spectra_aasist3.onnx` and checked against its published checksum. Use `--spectra-from <file>` or `SPECTRA_URL` to supply your own copy.
 - Already have models or environments on this machine? Create `local_config.py` (git ignores it) and set the same names as in `config.py`, for example `HF_HOME`, `QWEN_PYTHON`, `COSYVOICE_PYTHON`, `SPECTRA_ONNX`.
 - Start everything: `.\start_demo.ps1` (Windows) or `./start_demo.sh` (Mac/Linux).
@@ -85,9 +85,9 @@ python tests/smoke_api.py path/to/a-reference.wav
 
 ## What the quiz does
 
-Consent, then record the sentence (raw, 16 kHz mono), then a quality check. Sarvam, CosyVoice 2 and Qwen3-TTS make copies at the same time. The cards are shuffled: play, pick, win or lose, then the clone-check score for each voice.
+Consent, then record the sentence (raw, 16 kHz mono), then a quality check. Sarvam (twice, with different settings) and Qwen3-TTS make copies at the same time. The cards are shuffled: play, pick, win or lose, then the clone-check score for each voice.
 
-Cards = 1 real + one per engine. Three engines (Sarvam, CosyVoice 2, Qwen3-TTS), so 4 cards.
+Cards = 1 real + one per engine. Three engines (Sarvam, Sarvam with other settings, Qwen3-TTS), so 4 cards. CosyVoice 2 is still in the code as an optional extra (`python setup.py --only cosyvoice`, then add `cosyvoice` to `ENGINES` in `config.py`).
 
 ## Layout
 
@@ -114,4 +114,4 @@ Cards = 1 real + one per engine. Three engines (Sarvam, CosyVoice 2, Qwen3-TTS),
 
 - One participant at a time on the GPU worker (a second queues).
 - Raw capture turns the browser's noise suppression, echo cancellation and auto gain off, so a noisy room is audible in the clip.
-- Not yet tried from a fresh machine: `setup.py` was checked with `--check` and `--dry-run` only. The CosyVoice install is the most fragile part (needs Python 3.10).
+- Not yet tried from a fresh machine: `setup.py` was checked with `--check` and `--dry-run` only. The optional CosyVoice install is the most fragile part (needs Python 3.10).

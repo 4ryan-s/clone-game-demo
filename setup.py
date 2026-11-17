@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Set this demo up on a new laptop. Python 3.11+ is enough to start; the models are downloaded, not stored in git.
 
-    python setup.py                  everything (API, Qwen3-TTS, CosyVoice 2, clone-check model, React quiz build)
-    python setup.py --only api,qwen  just some parts: api, qwen, cosyvoice, spectra, frontend
+    python setup.py                  the default set (API, Qwen3-TTS, clone-check model, React quiz build)
+    python setup.py --only api,qwen  just some parts: api, qwen, spectra, frontend (cosyvoice is an optional extra: --only cosyvoice)
     python setup.py --cpu            no NVIDIA GPU (a Mac, for example): CPU/Apple builds of PyTorch, much slower
     python setup.py --check          show what is installed and what is missing, change nothing
     python setup.py --dry-run        print the commands instead of running them
 
-Needs about 20 GB of disk and an internet connection for the downloads.
+Needs about 8 GB of disk (CosyVoice, if you add it, is about 10 GB more) and an internet connection for the downloads.
 The clone-check model (Spectra-AASIST3, 1.2 GB, Apache-2.0) is downloaded from Hugging Face (lab260/Spectra-AASIST3)
 and checked against its published SHA-256. To use a copy you already have, pass `--spectra-from <file>` or set SPECTRA_URL.
 Sarvam needs the SARVAM_API_KEY environment variable; this script never asks for or stores it.
@@ -178,8 +178,9 @@ def check():
     mark(venv_python("qwen").exists() or Path(config.QWEN_PYTHON).exists(), "Qwen3-TTS environment", "python setup.py --only qwen")
     hub = Path(config.HF_HOME) / "hub" / ("models--" + config.QWEN_MODEL.replace("/", "--"))
     mark(hub.exists(), "Qwen3-TTS weights", "python setup.py --only qwen")
-    mark(Path(config.COSYVOICE_PYTHON).exists(), "CosyVoice environment", "python setup.py --only cosyvoice")
-    mark(Path(config.COSYVOICE_REPO).exists() and Path(config.COSYVOICE_MODEL_DIR).exists(), "CosyVoice code and weights", "python setup.py --only cosyvoice")
+    if "cosyvoice" in config.ENGINES:
+        mark(Path(config.COSYVOICE_PYTHON).exists(), "CosyVoice environment", "python setup.py --only cosyvoice")
+        mark(Path(config.COSYVOICE_REPO).exists() and Path(config.COSYVOICE_MODEL_DIR).exists(), "CosyVoice code and weights", "python setup.py --only cosyvoice")
     mark(Path(config.SPECTRA_ONNX).is_file(), "clone-check model", "see python setup.py --help")
     mark(bool(os.environ.get("SARVAM_API_KEY")), "Sarvam key in the environment (Windows: also checked in user variables at run time)", "set SARVAM_API_KEY")
     mark((ROOT / "frontend" / "dist" / "index.html").exists(), "React quiz build (the demo page)", "python setup.py --only frontend (needs Node.js 20+)")
@@ -190,7 +191,7 @@ def main():
     if sys.version_info < (3, 11):
         sys.exit(f"Python 3.11 or later is needed to run setup (this is {platform.python_version()}). On a Mac: `brew install python@3.12`, then `python3.12 setup.py`.")
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--only", default="api,qwen,cosyvoice,spectra,frontend")
+    ap.add_argument("--only", default="api,qwen,spectra,frontend")
     ap.add_argument("--cpu", action="store_true")
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
