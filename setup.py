@@ -169,6 +169,8 @@ def check():
 
 def main():
     global ARGS
+    if sys.version_info < (3, 11):
+        sys.exit(f"Python 3.11 or later is needed to run setup (this is {platform.python_version()}). On a Mac: `brew install python@3.12`, then `python3.12 setup.py`.")
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--only", default="api,qwen,cosyvoice,spectra,frontend")
     ap.add_argument("--cpu", action="store_true")

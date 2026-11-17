@@ -24,7 +24,7 @@ from qwen_tts import Qwen3TTSModel  # noqa: E402
 if torch.cuda.is_available():
     DEVICE, DTYPE = "cuda:0", torch.bfloat16
 elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
-    DEVICE, DTYPE = "mps", torch.float16
+    DEVICE, DTYPE = "mps", torch.float32     # float32: half precision on Apple GPUs can give garbled audio
 else:
     DEVICE, DTYPE = "cpu", torch.float32
 print(f"loading {config.QWEN_MODEL} on {DEVICE} ...", flush=True)
