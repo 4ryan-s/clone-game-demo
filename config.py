@@ -41,7 +41,7 @@ def venv_python(name: str) -> str:
 
 # The fixed sentence every participant reads, and every clone speaks.
 # PLACEHOLDER: pick the final one with the sentence test (10 to 15 words, reads in about 5 s).
-SENTENCE = "I am attending the Ruby conference in Hyderabad, India today."
+SENTENCE = "Hello everyone! I’m here in Hyderabad, India, attending the Ruby Conference today. Looking forward to an amazing experience!"
 
 # Recording limits (seconds). Sarvam accepts a reference of at most 15 s.
 MIN_SECONDS = 3.5

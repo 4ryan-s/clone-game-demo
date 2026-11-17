@@ -17,6 +17,7 @@ export function ResultStep({ result, cardIds, player, sid, onFinish, onDelete })
     .filter(Boolean);
   const clones = ordered.filter((card) => !card.real);
   const real = ordered.find((card) => card.real);
+  const shown = real ? [...clones, real] : ordered;
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -66,19 +67,19 @@ export function ResultStep({ result, cardIds, player, sid, onFinish, onDelete })
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div className="text-center">
         <h1 className="font-display text-3xl leading-tight text-balance sm:text-4xl">{won ? "You found your voice" : "A copy fooled you"}</h1>
-        {real && <p className="mt-2 text-muted">Voice {real.letter} was yours. These are the copies.</p>}
+        {real && <p className="mt-2 text-muted">Voice {real.letter} was yours.</p>}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {clones.map((card, index) => (
-          <div key={card.card} className="rise min-h-0" style={{ animationDelay: `${index * 80}ms` }}>
+      <div className="grid grid-cols-4 gap-3">
+        {shown.map((card, index) => (
+          <div key={card.card} className="rise min-h-0 min-w-0" style={{ animationDelay: `${index * 80}ms` }}>
             <VoiceCard
               letter={card.letter}
               playing={player.playingId === card.card}
               progress={player.progress}
               onPlay={() => play(card.card)}
               reveal={{
-                real: false,
+                real: card.real,
                 who: card.who,
                 margin: card.margin,
                 saysClone: card.says_clone,
