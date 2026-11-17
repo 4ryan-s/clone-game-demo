@@ -8,8 +8,8 @@
     python setup.py --dry-run        print the commands instead of running them
 
 Needs about 20 GB of disk and an internet connection for the downloads.
-The clone-check model (Spectra-AASIST3, 1.2 GB) is not public: put it at models/spectra_aasist3.onnx, or give
-`--spectra-from <file>`, or set SPECTRA_URL (and SPECTRA_TOKEN if the link needs a bearer token).
+The clone-check model (Spectra-AASIST3, 1.2 GB, Apache-2.0) is downloaded from Hugging Face (lab260/Spectra-AASIST3)
+and checked against its published SHA-256. To use a copy you already have, pass `--spectra-from <file>` or set SPECTRA_URL.
 Sarvam needs the SARVAM_API_KEY environment variable; this script never asks for or stores it.
 """
 import argparse
@@ -28,6 +28,8 @@ import config  # noqa: E402  (paths and model names live there; local_config.py 
 COSYVOICE_COMMIT = "074ca6d"
 COSYVOICE_REPO_URL = "https://github.com/FunAudioLLM/CosyVoice.git"
 COSYVOICE_HF_ID = "FunAudioLLM/CosyVoice2-0.5B"
+SPECTRA_URL = "https://huggingface.co/lab260/Spectra-AASIST3/resolve/main/spectra-aasist3.onnx"   # Apache-2.0, public
+SPECTRA_SHA256 = "5f05c29a01ad80c702b32654db87c2aa6e467c11c67b6d47f2fac873f846cae9"
 ARGS = None
 
 
@@ -118,6 +120,15 @@ def part_cosyvoice():
     hf_download(py, COSYVOICE_HF_ID, config.COSYVOICE_MODEL_DIR)
 
 
+def sha256_of(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 24), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def part_spectra(spectra_from=None):
     say("Clone-check model (Spectra-AASIST3)")
     dest = Path(config.SPECTRA_ONNX)
@@ -125,21 +136,28 @@ def part_spectra(spectra_from=None):
         print(f"   present: {dest} ({dest.stat().st_size / 1e6:.0f} MB)")
         return
     dest.parent.mkdir(parents=True, exist_ok=True)
-    url = os.environ.get("SPECTRA_URL")
+    url = os.environ.get("SPECTRA_URL", SPECTRA_URL)
+    part = dest.with_suffix(".onnx.part")
     if spectra_from:
         print(f"   copying {spectra_from}")
         if not ARGS.dry_run:
-            shutil.copyfile(spectra_from, dest)
-    elif url:
-        req = urllib.request.Request(url, headers={"Accept": "application/octet-stream"})
-        if os.environ.get("SPECTRA_TOKEN"):
-            req.add_header("Authorization", "Bearer " + os.environ["SPECTRA_TOKEN"])
-        print("   downloading from SPECTRA_URL ...")
-        if not ARGS.dry_run:
-            with urllib.request.urlopen(req) as r, open(dest, "wb") as f:
-                shutil.copyfileobj(r, f, 1 << 20)
+            shutil.copyfile(spectra_from, part)
     else:
-        print(f"   MISSING: {dest}\n   Copy spectra_aasist3.onnx there, or run with --spectra-from <file>, or set SPECTRA_URL.")
+        print(f"   downloading {url}")
+        if not ARGS.dry_run:
+            req = urllib.request.Request(url)
+            if os.environ.get("SPECTRA_TOKEN"):
+                req.add_header("Authorization", "Bearer " + os.environ["SPECTRA_TOKEN"])
+            with urllib.request.urlopen(req) as r, open(part, "wb") as f:
+                shutil.copyfileobj(r, f, 1 << 20)
+    if ARGS.dry_run:
+        return
+    if url == SPECTRA_URL or spectra_from:       # the published file: check it is the exact one we tested
+        if sha256_of(part) != SPECTRA_SHA256:
+            part.unlink()
+            sys.exit("The clone-check model did not match its published checksum, so it was not installed. Try again, or check the file.")
+    part.replace(dest)
+    print(f"   installed {dest} ({dest.stat().st_size / 1e6:.0f} MB, checksum ok)")
 
 
 def part_frontend():
