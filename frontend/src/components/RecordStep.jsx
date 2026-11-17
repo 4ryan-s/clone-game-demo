@@ -146,14 +146,14 @@ export function RecordStep({ sentence, maxSeconds, onSubmit }) {
   }
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col items-center justify-center text-center">
+    <div className="mx-auto flex w-full max-w-3xl flex-col items-center text-center">
       <StepHead title="Read this aloud" />
-      <blockquote className="mt-8 w-full rounded-[28px] border border-line bg-card px-10 py-12 shadow-[0_24px_50px_-36px_rgba(40,30,10,0.45)]">
-        <p className="font-display text-4xl leading-snug text-balance">{sentence}</p>
+      <blockquote className="mt-6 w-full rounded-[28px] border border-line bg-card px-6 py-6 shadow-[0_24px_50px_-36px_rgba(40,30,10,0.45)] sm:px-10 sm:py-8">
+        <p className="font-display text-2xl leading-snug text-balance sm:text-3xl">{sentence}</p>
       </blockquote>
 
-      <div className="mt-10 w-full">
-        <div className="flex h-44 w-full items-center gap-1.5" aria-hidden="true">
+      <div className="mt-7 w-full min-w-0">
+        <div className="flex h-20 w-full items-center gap-1 sm:h-24 sm:gap-1.5" aria-hidden="true">
           {wave.map((value, index) => (
             <span
               key={index}
@@ -162,12 +162,12 @@ export function RecordStep({ sentence, maxSeconds, onSubmit }) {
             />
           ))}
         </div>
-        <p className="mt-4 text-2xl tabular-nums text-muted" aria-live="polite">
+        <p className="mt-3 text-xl tabular-nums text-muted" aria-live="polite">
           {(review ? review.seconds : seconds).toFixed(1)} s
         </p>
       </div>
 
-      <div className="mt-8 flex w-full max-w-md flex-col items-center">
+      <div className="mt-7 flex w-full max-w-md flex-col items-center">
         {review ? (
           <div className="rise flex flex-wrap justify-center gap-3">
             <Button primary disabled={busy} onClick={useThis}>{busy ? "Checking…" : "Use this"}</Button>
@@ -175,7 +175,7 @@ export function RecordStep({ sentence, maxSeconds, onSubmit }) {
           </div>
         ) : (
           <>
-            <div className="relative h-28 w-28">
+            <div className="relative h-24 w-24">
               {recording && (
                 <>
                   <span className="pulse-ring absolute inset-0 rounded-full bg-accent/25" />
@@ -197,13 +197,15 @@ export function RecordStep({ sentence, maxSeconds, onSubmit }) {
                 {recording ? <span className="h-7 w-7 rounded-md bg-white" /> : <MicIcon />}
               </button>
             </div>
-            <p className="mt-4 text-lg font-semibold">{recording ? "Stop" : arming ? "Starting…" : "Record"}</p>
+            <p className="mt-3 text-lg font-semibold">{recording ? "Stop" : arming ? "Starting…" : "Record"}</p>
           </>
         )}
 
-        <div className="mt-3 min-h-5">
-          <ErrorNote>{error}</ErrorNote>
-        </div>
+        {error ? (
+          <div className="mt-3">
+            <ErrorNote>{error}</ErrorNote>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -211,7 +213,7 @@ export function RecordStep({ sentence, maxSeconds, onSubmit }) {
 
 function MicIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-12 w-12" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-9 w-9" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
       <rect x="9" y="3" width="6" height="11" rx="3" />
       <path d="M6 11a6 6 0 0 0 12 0M12 17v3.5M8.5 21h7" strokeLinecap="round" />
     </svg>
