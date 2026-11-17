@@ -8,6 +8,28 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+
+
+def _load_env():
+    """Read project .env into the process. A variable already set in the shell wins."""
+    path = ROOT / ".env"
+    if not path.is_file():
+        return
+    for raw in path.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):]
+        name, value = line.split("=", 1)
+        name = name.strip()
+        value = value.strip().strip('"').strip("'")
+        if name and name not in os.environ:
+            os.environ[name] = value
+
+
+_load_env()
+
 SESSIONS_DIR = ROOT / "data" / "sessions"
 MODELS_DIR = ROOT / "models"       # downloaded by setup.py (not in git: several GB)
 VENVS_DIR = ROOT / ".venvs"        # one Python environment per local engine, created by setup.py
@@ -19,7 +41,7 @@ def venv_python(name: str) -> str:
 
 # The fixed sentence every participant reads, and every clone speaks.
 # PLACEHOLDER: pick the final one with the sentence test (10 to 15 words, reads in about 5 s).
-SENTENCE = "Tell me about my last five transactions and the current interest rate."
+SENTENCE = "I am attending the Ruby conference in Hyderabad, India today."
 
 # Recording limits (seconds). Sarvam accepts a reference of at most 15 s.
 MIN_SECONDS = 3.5

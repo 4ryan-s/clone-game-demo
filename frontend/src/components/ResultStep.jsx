@@ -45,34 +45,31 @@ export function ResultStep({ result, cardIds, player, sid, onFinish, onDelete })
 
   if (!showScores) {
     return (
-      <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden text-center">
+      <div className="relative flex flex-col items-center overflow-hidden text-center">
         {won && <Confetti screen count={72} />}
         <div className={cx("relative flex flex-col items-center", won ? "pop" : "rise")}>
           {won ? <Stars filled={3} /> : <Stars filled={1} />}
-          <h1 className="mt-4 font-display text-6xl leading-tight">
+          <h1 className="mt-4 font-display text-4xl leading-tight text-balance sm:text-5xl lg:text-6xl">
             {won ? "Congratulations" : "A copy fooled you"}
           </h1>
           <p className="mt-3 text-lg text-muted">
             {won ? "That was your voice." : real ? `Voice ${real.letter} was yours.` : "That was a copy."}
           </p>
           <div className="mt-8">{won ? <Medal /> : <ScorecardMark />}</div>
-          <Button primary className="mt-10 min-w-52" onClick={() => setShowScores(true)}>See the copies</Button>
+          <Button primary className="mt-8 w-full max-w-xs sm:mt-10 sm:w-auto sm:min-w-52" onClick={() => setShowScores(true)}>See the copies</Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-5">
-      <div className="shrink-0 text-center">
-        <h1 className="font-display text-4xl leading-tight">{won ? "You found your voice" : "A copy fooled you"}</h1>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      <div className="text-center">
+        <h1 className="font-display text-3xl leading-tight text-balance sm:text-4xl">{won ? "You found your voice" : "A copy fooled you"}</h1>
         {real && <p className="mt-2 text-muted">Voice {real.letter} was yours. These are the copies.</p>}
       </div>
 
-      <div
-        className="grid shrink-0 gap-4"
-        style={{ gridTemplateColumns: `repeat(${Math.max(clones.length, 1)}, minmax(0, 1fr))` }}
-      >
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {clones.map((card, index) => (
           <div key={card.card} className="rise min-h-0" style={{ animationDelay: `${index * 80}ms` }}>
             <VoiceCard
@@ -93,12 +90,12 @@ export function ResultStep({ result, cardIds, player, sid, onFinish, onDelete })
         ))}
       </div>
 
-      <footer className="mt-auto flex shrink-0 flex-col items-center gap-4 pt-2">
+      <footer className="flex flex-col items-center gap-4 pt-1">
         <p className="text-sm text-muted">
           Code <strong className="ml-1 rounded-lg bg-card px-2 py-1 font-mono text-sm text-ink ring-1 ring-line">{sid}</strong>
         </p>
         <ErrorNote>{error}</ErrorNote>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap justify-center gap-3">
           <Button disabled={!!closing} onClick={() => run("delete")}>{closing === "delete" ? "Deleting…" : "Delete"}</Button>
           <Button primary disabled={!!closing} onClick={() => run("finish")}>{closing === "finish" ? "Finishing…" : "Finish"}</Button>
         </div>
@@ -126,7 +123,7 @@ function Stars({ filled }) {
 
 function Medal() {
   return (
-    <svg viewBox="0 0 120 150" className="pop h-44 w-36 shrink-0" aria-hidden="true">
+    <svg viewBox="0 0 120 150" className="pop h-32 w-28 shrink-0 sm:h-44 sm:w-36" aria-hidden="true">
       <path d="M36 8h16l8 30H44z" fill="#c4493a" />
       <path d="M68 8h16l-8 30H60z" fill="#0f6f5b" />
       <path d="M46 34h28l-6 16H52z" fill="#a67912" />

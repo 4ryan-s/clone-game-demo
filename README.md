@@ -23,7 +23,7 @@ python setup.py --check      # shows what is installed and what is missing
 ```
 
 - No NVIDIA GPU: `python setup.py --cpu`. It works but is much slower.
-- Mac: Apple Silicon only (PyTorch 2.11 has no Intel-Mac build). Use Python 3.11 or 3.12 (`brew install python@3.12`); the Mac's built-in `python3` is too old. Qwen3-TTS runs on the Apple GPU. Sarvam needs no setup beyond its key, so on a Mac it is the fast path. **None of the Mac path has been run on a real Mac yet.**
+- Mac: Apple Silicon only (PyTorch 2.11 has no Intel-Mac build). Python 3.11 or later is enough, including 3.14; Qwen3-TTS uses the same interpreter that runs `setup.py`. Qwen3-TTS runs on the Apple GPU. Sarvam needs no setup beyond its key, so on a Mac it is the fast path. **None of the Mac path has been run on a real Mac yet.**
 - The models are downloaded, not stored in git: Qwen3-TTS from Hugging Face (`Qwen/Qwen3-TTS-12Hz-0.6B-Base`), the clone-check model from Hugging Face (below), both into `models/`.
 - The clone-check model (Spectra-AASIST3, 1.2 GB, Apache-2.0) is downloaded from Hugging Face (`lab260/Spectra-AASIST3`) into `models/spectra_aasist3.onnx` and checked against its published checksum. Use `--spectra-from <file>` or `SPECTRA_URL` to supply your own copy.
 - Already have models or environments on this machine? Create `local_config.py` (git ignores it) and set the same names as in `config.py`, for example `HF_HOME`, `QWEN_PYTHON`, `SPECTRA_ONNX`.

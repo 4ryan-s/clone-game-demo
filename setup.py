@@ -97,7 +97,7 @@ def part_api():
 def part_qwen():
     say("Qwen3-TTS: environment and weights")
     py = venv_python("qwen")
-    make_venv(ROOT / ".venvs" / "qwen", "3.11")
+    make_venv(ROOT / ".venvs" / "qwen")
     torch_install(py, "2.11.0", "2.11.0", "cu128")
     pip(py, "-r", ROOT / "requirements" / "qwen.txt")
     hf_download(py, config.QWEN_MODEL)
