@@ -100,7 +100,7 @@ def part_api():
 def part_qwen():
     say("Qwen3-TTS: environment and weights")
     py = venv_python("qwen")
-    make_venv(ROOT / ".venvs" / "qwen", "3.11")
+    make_venv(ROOT / ".venvs" / "qwen")
     torch_install(py, "2.11.0", "2.11.0", "cu128")
     pip(py, "-r", ROOT / "requirements" / "qwen.txt")
     hf_download(py, config.QWEN_MODEL)
@@ -109,8 +109,8 @@ def part_qwen():
 def part_cosyvoice():
     say("CosyVoice 2: environment, code and weights")
     py = venv_python("cosyvoice")
-    make_venv(ROOT / ".venvs" / "cosyvoice", "3.10")
-    torch_install(py, "2.3.1", "2.3.1", "cu121")
+    make_venv(ROOT / ".venvs" / "cosyvoice")
+    torch_install(py, "2.11.0", "2.11.0", "cu128")
     pip(py, "-r", ROOT / "requirements" / "cosyvoice.txt")
     repo = config.COSYVOICE_REPO
     if not repo.exists():
