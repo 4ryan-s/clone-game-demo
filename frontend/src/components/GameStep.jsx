@@ -31,24 +31,13 @@ export function GameStep({ cardIds, player, onLock }) {
     }
   }
 
-  const voices = cardIds.length;
-
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <StepHead
-        kicker="Round 04 · The question"
-        title="Which one is really you?"
-        lede={voices
-          ? `All ${voices} say the same sentence. One is your own recording, the others are copies made by AI voice systems. Listen to each, then pick the real one.`
-          : "Listen to each voice, then pick the real one."}
-      />
+    <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+      <StepHead title="Which one is you?" />
 
-      <div
-        className="mt-6 grid min-h-0 flex-1 gap-5"
-        style={{ gridTemplateColumns: `repeat(${Math.max(voices, 1)}, minmax(0, 1fr))` }}
-      >
+      <div className="mx-auto mt-6 grid w-full max-w-4xl grid-cols-2 gap-5">
         {cardIds.map((id, index) => (
-          <div key={id} className="rise min-h-0" style={{ animationDelay: `${index * 70}ms` }}>
+          <div key={id} className="rise" style={{ animationDelay: `${index * 70}ms` }}>
             <VoiceCard
               letter={String.fromCharCode(65 + index)}
               playing={player.playingId === id}
@@ -62,15 +51,10 @@ export function GameStep({ cardIds, player, onLock }) {
         ))}
       </div>
 
-      <footer className="mt-5 flex items-center justify-between gap-6">
-        <div>
-          <ErrorNote>{error}</ErrorNote>
-          <p className="text-sm text-muted">
-            {heard.length} of {voices} {voices === 1 ? "voice" : "voices"} played
-          </p>
-        </div>
-        <Button primary className="min-w-64" disabled={!picked || busy} onClick={lock}>
-          {busy ? "Checking…" : picked ? "Lock in my answer" : "Choose a voice first"}
+      <footer className="mt-5 flex flex-col items-center gap-3">
+        <ErrorNote>{error}</ErrorNote>
+        <Button primary className="min-w-52" disabled={!picked || busy} onClick={lock}>
+          {busy ? "Checking…" : picked ? "Lock in" : "Pick a voice"}
         </Button>
       </footer>
     </div>

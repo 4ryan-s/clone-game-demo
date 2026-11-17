@@ -1,32 +1,28 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, ErrorNote } from "./ui";
 import { VoiceCard } from "./VoiceCard";
 import { Confetti } from "./Confetti";
 import { cx } from "../lib/cx";
 
-export function ResultStep({ result, cardIds, player, retain, sid, onFinish, onDelete }) {
+export function ResultStep({ result, cardIds, player, sid, onFinish, onDelete }) {
+  const won = result.won;
+  const [showScores, setShowScores] = useState(false);
   const [closing, setClosing] = useState("");
   const [error, setError] = useState("");
-  const won = result.won;
-  const clones = result.cards.filter((card) => !card.real);
-  const real = result.cards.find((card) => card.real);
-  const caught = clones.filter((card) => card.says_clone).length;
   const ordered = (cardIds.length ? cardIds : result.cards.map((card) => card.card))
     .map((id, index) => {
       const card = result.cards.find((item) => item.card === id);
       return card ? { ...card, letter: String.fromCharCode(65 + index) } : null;
     })
     .filter(Boolean);
+  const clones = ordered.filter((card) => !card.real);
+  const real = ordered.find((card) => card.real);
 
-  const realCall = !real
-    ? ""
-    : real.says_clone
-      ? " It wrongly doubted your real voice."
-      : " It passed your real voice.";
-  const note = `The score shows how strongly the detector thinks a voice is real. Below ${result.cutoff} it calls the voice a clone. It caught ${caught} of ${clones.length} clones.${realCall}`;
-  const finishNote = retain
-    ? "You agreed that we keep your recording and the copies without your name. Use the session code to ask for deletion later."
-    : "You did not agree to keep your recording, so it is deleted when you press Finish.";
+  useEffect(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timer = window.setTimeout(() => setShowScores(true), reduce ? 400 : 2800);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   async function run(kind) {
     setClosing(kind);
@@ -47,49 +43,45 @@ export function ResultStep({ result, cardIds, player, retain, sid, onFinish, onD
     }
   }
 
+  if (!showScores) {
+    return (
+      <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden text-center">
+        {won && <Confetti screen count={72} />}
+        <div className={cx("relative flex flex-col items-center", won ? "pop" : "rise")}>
+          {won ? <Stars filled={3} /> : <Stars filled={1} />}
+          <h1 className="mt-4 font-display text-6xl leading-tight">
+            {won ? "Congratulations" : "A copy fooled you"}
+          </h1>
+          <p className="mt-3 text-lg text-muted">
+            {won ? "That was your voice." : real ? `Voice ${real.letter} was yours.` : "That was a copy."}
+          </p>
+          <div className="mt-8">{won ? <Medal /> : <ScorecardMark />}</div>
+          <Button primary className="mt-10 min-w-52" onClick={() => setShowScores(true)}>See the copies</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-5">
-      <section className={cx(
-        "relative shrink-0 overflow-hidden rounded-[28px] border-2 px-8 py-5",
-        won ? "border-[#b7dfc8] bg-good-soft" : "border-[#e7c3bd] bg-bad-soft",
-      )}>
-        {won && <Confetti />}
-        <span className="shine pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-transparent via-white/70 to-transparent" />
-        <div className="relative flex items-center justify-between gap-8">
-          <div>
-            <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-accent">Round 05 · Reward</p>
-            <Stars filled={won ? 3 : 1} />
-            <h1 className="mt-2 font-display text-5xl leading-[1.05]">
-              {won ? "You spotted the real one" : "The AI fooled you"}
-            </h1>
-            <p className="mt-3 max-w-2xl text-lg text-muted">
-              {won
-                ? "Your ear was right. Here is what our clone check made of each voice."
-                : "You picked a copy. Here is what our clone check made of each voice."}
-            </p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Prize won={won} />
-              <Stat label="Your pick" value={won ? "Real voice" : "A copy"} />
-              <Stat label="Clones caught" value={`${caught} of ${clones.length}`} />
-            </div>
-          </div>
-          {won ? <Medal /> : <ScorecardMark />}
-        </div>
-      </section>
+      <div className="shrink-0 text-center">
+        <h1 className="font-display text-4xl leading-tight">{won ? "You found your voice" : "A copy fooled you"}</h1>
+        {real && <p className="mt-2 text-muted">Voice {real.letter} was yours. These are the copies.</p>}
+      </div>
 
       <div
         className="grid shrink-0 gap-4"
-        style={{ gridTemplateColumns: `repeat(${Math.max(ordered.length, 1)}, minmax(0, 1fr))` }}
+        style={{ gridTemplateColumns: `repeat(${Math.max(clones.length, 1)}, minmax(0, 1fr))` }}
       >
-        {ordered.map((card, index) => (
-          <div key={card.card} className="rise min-h-0" style={{ animationDelay: `${120 + index * 80}ms` }}>
+        {clones.map((card, index) => (
+          <div key={card.card} className="rise min-h-0" style={{ animationDelay: `${index * 80}ms` }}>
             <VoiceCard
               letter={card.letter}
               playing={player.playingId === card.card}
               progress={player.progress}
               onPlay={() => play(card.card)}
               reveal={{
-                real: card.real,
+                real: false,
                 who: card.who,
                 margin: card.margin,
                 saysClone: card.says_clone,
@@ -101,17 +93,13 @@ export function ResultStep({ result, cardIds, player, retain, sid, onFinish, onD
         ))}
       </div>
 
-      <footer className="mt-auto flex shrink-0 items-end justify-between gap-6 pt-1">
-        <div className="max-w-3xl">
-          <p className="text-sm leading-relaxed text-muted">{note}</p>
-          <p className="mt-1 text-sm leading-relaxed text-muted">{finishNote}</p>
-          <p className="mt-2 text-sm text-muted">
-            Session code <strong className="ml-1 rounded-lg bg-card px-2 py-1 font-mono text-sm text-ink ring-1 ring-line">{sid}</strong>
-          </p>
-          <div className="mt-2"><ErrorNote>{error}</ErrorNote></div>
-        </div>
-        <div className="flex shrink-0 gap-3">
-          <Button disabled={!!closing} onClick={() => run("delete")}>{closing === "delete" ? "Deleting…" : "Delete my data"}</Button>
+      <footer className="mt-auto flex shrink-0 flex-col items-center gap-4 pt-2">
+        <p className="text-sm text-muted">
+          Code <strong className="ml-1 rounded-lg bg-card px-2 py-1 font-mono text-sm text-ink ring-1 ring-line">{sid}</strong>
+        </p>
+        <ErrorNote>{error}</ErrorNote>
+        <div className="flex gap-3">
+          <Button disabled={!!closing} onClick={() => run("delete")}>{closing === "delete" ? "Deleting…" : "Delete"}</Button>
           <Button primary disabled={!!closing} onClick={() => run("finish")}>{closing === "finish" ? "Finishing…" : "Finish"}</Button>
         </div>
       </footer>
@@ -119,32 +107,14 @@ export function ResultStep({ result, cardIds, player, retain, sid, onFinish, onD
   );
 }
 
-function Prize({ won }) {
-  return (
-    <div className="rounded-2xl bg-card px-4 py-3 ring-1 ring-line">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gold">Prize</p>
-      <p className="font-display text-xl">{won ? "Sharp Ear" : "Detector's scorecard"}</p>
-    </div>
-  );
-}
-
-function Stat({ label, value }) {
-  return (
-    <div className="rounded-2xl bg-card px-4 py-3 ring-1 ring-line">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">{label}</p>
-      <p className="font-display text-xl">{value}</p>
-    </div>
-  );
-}
-
 function Stars({ filled }) {
   return (
-    <div className="mt-3 flex gap-1" aria-hidden="true">
+    <div className="flex justify-center gap-1" aria-hidden="true">
       {[0, 1, 2].map((index) => (
         <svg
           key={index}
           viewBox="0 0 24 24"
-          className={cx("h-7 w-7 rise", index < filled ? "fill-gold" : "fill-line")}
+          className={cx("h-8 w-8 rise", index < filled ? "fill-gold" : "fill-line")}
           style={{ animationDelay: `${index * 120}ms` }}
         >
           <path d="M12 2.4 14.7 8.8l7 .6-5.3 4.6 1.7 6.8L12 17.4 5.9 20.8l1.7-6.8L2.3 9.4l7-.6z" />
@@ -156,7 +126,7 @@ function Stars({ filled }) {
 
 function Medal() {
   return (
-    <svg viewBox="0 0 120 150" className="pop h-40 w-36 shrink-0" aria-hidden="true">
+    <svg viewBox="0 0 120 150" className="pop h-44 w-36 shrink-0" aria-hidden="true">
       <path d="M36 8h16l8 30H44z" fill="#c4493a" />
       <path d="M68 8h16l-8 30H60z" fill="#0f6f5b" />
       <path d="M46 34h28l-6 16H52z" fill="#a67912" />

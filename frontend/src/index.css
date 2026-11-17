@@ -105,6 +105,12 @@ body {
   top: 0;
   animation: fall linear forwards;
 }
+@keyframes fall-screen {
+  0% { transform: translate3d(0, -24px, 0) rotate(0deg); opacity: 0; }
+  8% { opacity: 1; }
+  100% { transform: translate3d(var(--drift), 78vh, 0) rotate(var(--rot)); opacity: 0; }
+}
+.confetti-screen .confetti-bit { animation-name: fall-screen; }
 
 @keyframes shine {
   from { transform: translateX(-40%); }
@@ -135,7 +141,7 @@ body {
 .gauge-dot { transition: left 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
 
 @media (prefers-reduced-motion: reduce) {
-  .rise, .pop, .spin, .eq, .pulse-ring, .scan, .confetti-bit, .shine, .draw, .blink {
+  .rise, .pop, .spin, .eq, .pulse-ring, .scan, .confetti-bit, .confetti-screen .confetti-bit, .shine, .draw, .blink {
     animation: none !important;
   }
   .confetti-bit { display: none; }

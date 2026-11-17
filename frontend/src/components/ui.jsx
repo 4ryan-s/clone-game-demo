@@ -29,13 +29,9 @@ export function ErrorNote({ children }) {
   );
 }
 
-export function StepHead({ kicker, title, lede }) {
+export function StepHead({ title }) {
   return (
-    <header className="max-w-3xl">
-      <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-accent">{kicker}</p>
-      <h1 className="mt-2 font-display text-[44px] leading-[1.08] text-balance text-ink">{title}</h1>
-      {lede ? <p className="mt-3 max-w-2xl text-lg leading-relaxed text-muted">{lede}</p> : null}
-    </header>
+    <h1 className="text-center font-display text-4xl leading-tight text-balance text-ink">{title}</h1>
   );
 }
 

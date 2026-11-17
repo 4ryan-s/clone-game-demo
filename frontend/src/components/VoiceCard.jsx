@@ -18,7 +18,8 @@ export function VoiceCard({ letter, playing, progress, onPlay, selected, onPick,
 
   return (
     <article className={cx(
-      "flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border-2 bg-card px-5 py-5 text-center shadow-[0_18px_40px_-32px_rgba(40,30,10,0.55)] transition duration-200",
+      "flex min-h-0 flex-col overflow-hidden rounded-[28px] border-2 bg-card text-center shadow-[0_18px_40px_-32px_rgba(40,30,10,0.55)] transition duration-200",
+      reveal ? "h-full px-5 py-5" : "h-auto px-4 py-4",
       border,
       !reveal && selected && "-translate-y-1 shadow-[0_0_0_6px_rgba(15,111,91,0.14)]",
       !reveal && !selected && "hover:-translate-y-1",
@@ -26,7 +27,7 @@ export function VoiceCard({ letter, playing, progress, onPlay, selected, onPick,
       <div className={cx("flex items-center", reveal ? "justify-between text-left" : "flex-col")}>
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">Voice</p>
-          <h2 className={cx("font-display leading-none", reveal ? "text-4xl" : "text-6xl")}>{letter}</h2>
+          <h2 className={cx("font-display leading-none", reveal ? "text-4xl" : "text-5xl")}>{letter}</h2>
         </div>
         {reveal && (
           <PlayButton letter={letter} playing={playing} onPlay={onPlay} size="h-14 w-14" icon="h-6 w-6" />
@@ -35,7 +36,7 @@ export function VoiceCard({ letter, playing, progress, onPlay, selected, onPick,
 
       {!reveal && (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 py-4">
-          <PlayButton letter={letter} playing={playing} onPlay={onPlay} size="h-20 w-20" icon="h-8 w-8" />
+          <PlayButton letter={letter} playing={playing} onPlay={onPlay} size="h-16 w-16" icon="h-7 w-7" />
           <Wave playing={playing} />
           <Meter playing={playing} progress={progress} />
         </div>
@@ -75,12 +76,15 @@ export function VoiceCard({ letter, playing, progress, onPlay, selected, onPick,
           <button
             type="button"
             onClick={onPick}
+            disabled={!heard}
             className={cx(
-              "w-full cursor-pointer rounded-2xl border px-4 py-3 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+              "w-full rounded-2xl border px-4 py-2.5 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+              "disabled:cursor-not-allowed disabled:opacity-40",
+              heard && "cursor-pointer",
               selected ? "border-accent bg-accent text-white" : "border-line bg-white text-ink hover:border-accent",
             )}
           >
-            {selected ? "✓ Selected" : "This one is me"}
+            {selected ? "✓ Selected" : heard ? "This one is me" : "Play to choose"}
           </button>
         </div>
       )}

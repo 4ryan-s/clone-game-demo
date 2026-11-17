@@ -2,8 +2,8 @@ import { useMemo } from "react";
 
 const COLORS = ["#0f6f5b", "#e8c36a", "#f4efe6", "#1c1915", "#e07a4c", "#8fd0b8"];
 
-export function Confetti() {
-  const pieces = useMemo(() => Array.from({ length: 42 }, (_, id) => ({
+export function Confetti({ screen = false, count = 42 }) {
+  const pieces = useMemo(() => Array.from({ length: count }, (_, id) => ({
     id,
     left: Math.random() * 100,
     delay: Math.random() * 0.35,
@@ -14,10 +14,10 @@ export function Confetti() {
     w: 7 + Math.random() * 7,
     h: 9 + Math.random() * 8,
     radius: Math.random() > 0.7 ? "999px" : "2px",
-  })), []);
+  })), [count]);
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+    <div className={screen ? "confetti-screen pointer-events-none absolute inset-0 overflow-hidden" : "pointer-events-none absolute inset-0 overflow-hidden"} aria-hidden="true">
       {pieces.map((piece) => (
         <span
           key={piece.id}

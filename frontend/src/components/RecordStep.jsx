@@ -3,12 +3,17 @@ import { encodeWav, resampleTo16k } from "../lib/audio";
 import { cx } from "../lib/cx";
 import { Button, ErrorNote, StepHead } from "./ui";
 
+const BARS = 48;
+const quietWave = () => Array(BARS).fill(0.08);
+
 export function RecordStep({ sentence, maxSeconds, onSubmit }) {
   const recRef = useRef(null);
+  const waveRef = useRef(quietWave());
+  const paintedAt = useRef(0);
   const [recording, setRecording] = useState(false);
   const [arming, setArming] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [level, setLevel] = useState(0);
+  const [wave, setWave] = useState(quietWave);
   const [hot, setHot] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [review, setReview] = useState(null);
@@ -26,9 +31,11 @@ export function RecordStep({ sentence, maxSeconds, onSubmit }) {
   }, []);
 
   function reset() {
+    const quiet = quietWave();
+    waveRef.current = quiet;
+    setWave(quiet);
     setReview(null);
     setError("");
-    setLevel(0);
     setHot(false);
     setSeconds(0);
   }
@@ -45,6 +52,7 @@ export function RecordStep({ sentence, maxSeconds, onSubmit }) {
     await rec.ctx.close();
     recRef.current = null;
     setRecording(false);
+    setHot(false);
     const data = new Float32Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
     let offset = 0;
     chunks.forEach((chunk) => {
@@ -52,8 +60,6 @@ export function RecordStep({ sentence, maxSeconds, onSubmit }) {
       offset += chunk.length;
     });
     const pcm = await resampleTo16k(data, rate);
-    setLevel(0);
-    setHot(false);
     setReview({ seconds: data.length / rate, blob: encodeWav(pcm, 16000) });
   }
 
@@ -76,7 +82,10 @@ export function RecordStep({ sentence, maxSeconds, onSubmit }) {
       await ctx.audioWorklet.addModule("/recorder-worklet.js");
       const src = ctx.createMediaStreamSource(stream);
       const node = new AudioWorkletNode(ctx, "recorder");
-      const rec = { stream, ctx, node, src, chunks: [], samples: 0, stopping: false };
+      const quiet = quietWave();
+      waveRef.current = quiet;
+      setWave(quiet);
+      const rec = { stream, ctx, node, src, chunks: [], samples: 0, stopping: false, levelSum: 0, levelCount: 0, framePeak: 0 };
       const maxSamples = Math.floor(maxSeconds * ctx.sampleRate);
       node.port.onmessage = (event) => {
         const live = recRef.current;
@@ -92,10 +101,24 @@ export function RecordStep({ sentence, maxSeconds, onSubmit }) {
           const abs = Math.abs(value);
           if (abs > peak) peak = abs;
         }
-        const rms = Math.sqrt(sum / chunk.length);
-        setLevel(Math.min(1, Math.max(0, (20 * Math.log10(rms + 1e-9) + 60) / 60)));
-        setHot(peak > 0.98);
+        live.levelSum += Math.sqrt(sum / chunk.length);
+        live.levelCount += 1;
+        if (peak > live.framePeak) live.framePeak = peak;
         setSeconds(live.samples / ctx.sampleRate);
+        const now = performance.now();
+        if (now - paintedAt.current > 45 && live.levelCount) {
+          paintedAt.current = now;
+          const rms = live.levelSum / live.levelCount;
+          const loud = Math.min(1, Math.max(0, (20 * Math.log10(rms + 1e-9) + 52) / 52));
+          const bars = waveRef.current;
+          bars.push(loud);
+          bars.shift();
+          setWave(bars.slice());
+          setHot(live.framePeak > 0.98);
+          live.levelSum = 0;
+          live.levelCount = 0;
+          live.framePeak = 0;
+        }
         if (live.samples >= maxSamples) stopRecording();
       };
       src.connect(node);
@@ -123,76 +146,63 @@ export function RecordStep({ sentence, maxSeconds, onSubmit }) {
   }
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-12 gap-8">
-      <div className="col-span-7 flex min-h-0 flex-col">
-        <StepHead
-          kicker="Round 02 · Your line"
-          title="Read this sentence out loud"
-          lede="Hold the microphone close and speak at a normal pace. You will not hear the take back — that would give the real voice away."
-        />
-        <blockquote className="relative mt-8 flex flex-1 items-center rounded-[28px] border border-line bg-card px-10 py-12 shadow-[0_24px_50px_-36px_rgba(40,30,10,0.45)]">
-          <span className="pointer-events-none absolute left-8 top-4 font-display text-8xl leading-none text-gold/35" aria-hidden="true">“</span>
-          <p className="font-display text-[40px] leading-[1.25] text-balance">{sentence}</p>
-        </blockquote>
+    <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col items-center justify-center text-center">
+      <StepHead title="Read this aloud" />
+      <blockquote className="mt-8 w-full rounded-[28px] border border-line bg-card px-10 py-12 shadow-[0_24px_50px_-36px_rgba(40,30,10,0.45)]">
+        <p className="font-display text-4xl leading-snug text-balance">{sentence}</p>
+      </blockquote>
+
+      <div className="mt-10 w-full">
+        <div className="flex h-44 w-full items-center gap-1.5" aria-hidden="true">
+          {wave.map((value, index) => (
+            <span
+              key={index}
+              className={cx("min-w-0 flex-1 rounded-full transition-[height] duration-75", hot ? "bg-bad" : "bg-accent")}
+              style={{ height: `${Math.max(12, Math.round(value * 100))}%`, opacity: recording || review ? 0.5 + value * 0.5 : 0.35 }}
+            />
+          ))}
+        </div>
+        <p className="mt-4 text-2xl tabular-nums text-muted" aria-live="polite">
+          {(review ? review.seconds : seconds).toFixed(1)} s
+        </p>
       </div>
 
-      <div className="col-span-5 min-h-0">
-        <div className="flex h-full flex-col items-center justify-center rounded-[28px] border border-line bg-card px-8 py-10 text-center shadow-[0_24px_50px_-36px_rgba(40,30,10,0.45)]">
-          <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-accent">The booth</p>
-          <p className="mt-2 font-display text-3xl">Your microphone</p>
-
-          {review ? (
-            <div className="rise mt-8 flex flex-col items-center">
-              <span className="pop grid h-20 w-20 place-items-center rounded-full bg-good text-3xl text-white">✓</span>
-              <p className="mt-5 text-lg">Recording captured ({review.seconds.toFixed(1)} s)</p>
-              <div className="mt-6 flex flex-wrap justify-center gap-3">
-                <Button primary disabled={busy} onClick={useThis}>{busy ? "Checking…" : "Use this recording"}</Button>
-                <Button disabled={busy} onClick={reset}>Record again</Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="relative mt-8 h-36 w-36">
-                {recording && (
-                  <>
-                    <span className="pulse-ring absolute inset-0 rounded-full bg-accent/25" />
-                    <span className="pulse-ring absolute inset-0 rounded-full bg-accent/20" style={{ animationDelay: "0.5s" }} />
-                  </>
+      <div className="mt-8 flex w-full max-w-md flex-col items-center">
+        {review ? (
+          <div className="rise flex flex-wrap justify-center gap-3">
+            <Button primary disabled={busy} onClick={useThis}>{busy ? "Checking…" : "Use this"}</Button>
+            <Button disabled={busy} onClick={reset}>Record again</Button>
+          </div>
+        ) : (
+          <>
+            <div className="relative h-28 w-28">
+              {recording && (
+                <>
+                  <span className="pulse-ring absolute inset-0 rounded-full bg-accent/25" />
+                  <span className="pulse-ring absolute inset-0 rounded-full bg-accent/20" style={{ animationDelay: "0.5s" }} />
+                </>
+              )}
+              <button
+                type="button"
+                className={cx(
+                  "relative grid h-full w-full cursor-pointer place-items-center rounded-full text-white transition duration-150",
+                  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent",
+                  "disabled:cursor-not-allowed disabled:opacity-40",
+                  recording ? "bg-bad hover:brightness-110" : "bg-accent hover:bg-accent-deep",
                 )}
-                <button
-                  type="button"
-                  className={cx(
-                    "relative grid h-full w-full cursor-pointer place-items-center rounded-full text-white transition duration-150",
-                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent",
-                    "disabled:cursor-not-allowed disabled:opacity-40",
-                    recording ? "bg-bad hover:brightness-110" : "bg-accent hover:bg-accent-deep",
-                  )}
-                  disabled={arming}
-                  onClick={() => (recording ? stopRecording() : startRecording())}
-                  aria-label={recording ? "Stop recording" : "Start recording"}
-                >
-                  {recording ? <span className="h-8 w-8 rounded-md bg-white" /> : <MicIcon />}
-                </button>
-              </div>
-              <p className="mt-6 text-lg font-semibold">{recording ? "Stop" : arming ? "Starting…" : "Start recording"}</p>
-            </>
-          )}
-
-          <div className="mt-8 w-full">
-            <div className="h-3 overflow-hidden rounded-full bg-mist" aria-hidden="true">
-              <div className={cx("meter-bar h-full rounded-full", hot ? "bg-bad" : "bg-good")} style={{ width: `${Math.round(level * 100)}%` }} />
+                disabled={arming}
+                onClick={() => (recording ? stopRecording() : startRecording())}
+                aria-label={recording ? "Stop recording" : "Start recording"}
+              >
+                {recording ? <span className="h-7 w-7 rounded-md bg-white" /> : <MicIcon />}
+              </button>
             </div>
-            <p className="mt-3 text-2xl tabular-nums text-muted" aria-live="polite">{(review ? review.seconds : seconds).toFixed(1)} s</p>
-          </div>
+            <p className="mt-4 text-lg font-semibold">{recording ? "Stop" : arming ? "Starting…" : "Record"}</p>
+          </>
+        )}
 
-          <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted">
-            {recording
-              ? "Press stop when you finish the sentence."
-              : `Stops automatically after ${maxSeconds} seconds. Press stop when you finish.`}
-          </p>
-          <div className="mt-3 min-h-5">
-            <ErrorNote>{error}</ErrorNote>
-          </div>
+        <div className="mt-3 min-h-5">
+          <ErrorNote>{error}</ErrorNote>
         </div>
       </div>
     </div>
