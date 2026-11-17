@@ -1,9 +1,11 @@
 """Where a session lives on disk:  data/sessions/<id>/
     consent.json   what the participant agreed to, which wording version, when
     original.wav   their recording, 16 kHz mono PCM16
-    raw/<engine>.wav   what each engine produced, untouched (kept for later model training if consent allows)
+    raw/<engine>.wav   what each engine produced, untouched
     clones/<slot>.wav  the same clips at 16 kHz mono PCM16, which is what the game plays and scores
     meta.json      slot-to-engine mapping, timings, errors (never sent to the browser before the pick)
+This folder is working data only and is deleted when the session ends, whatever the participant agreed to.
+A participant who agreed to keep their recording has it copied into data/voice_samples/ (see voicebank.py).
 """
 import json
 import re
@@ -70,16 +72,16 @@ def delete(sid: str) -> None:
         shutil.rmtree(path(sid), ignore_errors=True)
 
 
-def purge_unconsented(max_age_hours: float = 24.0) -> int:
-    """Delete sessions whose participant did not agree to retention and that are older than max_age_hours
-    (for example when someone closed the tab before finishing). Returns how many were removed."""
+def purge_stale(max_age_hours: float = 24.0) -> int:
+    """Delete working sessions older than max_age_hours (for example when someone closed the tab before finishing).
+    This is safe for consenting participants too: their recording was already copied into the voice bank (voicebank.py)
+    when it was accepted, and nothing else from a session is kept. Returns how many were removed."""
     removed = 0
     if not config.SESSIONS_DIR.is_dir():
         return 0
     for d in config.SESSIONS_DIR.iterdir():
         try:
-            consent = json.loads((d / "consent.json").read_text(encoding="utf-8")) if (d / "consent.json").exists() else {}
-            if not consent.get("retain") and time.time() - d.stat().st_mtime > max_age_hours * 3600:
+            if d.is_dir() and time.time() - d.stat().st_mtime > max_age_hours * 3600:
                 shutil.rmtree(d, ignore_errors=True)
                 removed += 1
         except Exception:  # noqa: BLE001

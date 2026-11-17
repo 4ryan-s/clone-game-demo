@@ -30,7 +30,8 @@ def _load_env():
 
 _load_env()
 
-SESSIONS_DIR = ROOT / "data" / "sessions"
+SESSIONS_DIR = ROOT / "data" / "sessions"                # working data of one play-through; deleted when it ends
+VOICE_SAMPLES_DIR = ROOT / "data" / "voice_samples"      # numbered recordings kept with consent (see voicebank.py); data/ is git-ignored
 MODELS_DIR = ROOT / "models"       # downloaded by setup.py (not in git: several GB)
 VENVS_DIR = ROOT / ".venvs"        # one Python environment per local engine, created by setup.py
 
@@ -80,7 +81,7 @@ SARVAM_TIMEOUT_S = 90
 # Shown on the consent page as the person to contact to delete a recording. Leave empty to say "ask the demo host".
 CONTACT = ""
 
-CONSENT_VERSION = "draft-1"   # bump whenever the consent wording changes; stored with every session
+CONSENT_VERSION = "draft-2"   # bump whenever the consent wording changes; stored with every session
 
 try:                           # machine-specific overrides (paths to models and environments that already exist here)
     from local_config import *  # noqa: F401,F403

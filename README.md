@@ -100,13 +100,16 @@ Cards = 1 real + one per engine. Three engines (Sarvam, Sarvam with other settin
 - `workers/qwen3tts_server.py` keeps Qwen3-TTS loaded on the GPU, in its own environment under `.venvs/qwen`.
 - `setup.py` one-command setup and download of the models. `local_config.py` (not in git) overrides paths on one machine.
 - `static/` the original page (plain HTML, CSS and JS, no build step).
-- `data/sessions/<id>/` per participant: `consent.json`, `original.wav`, `raw/` (engine output untouched), `clones/` (16 kHz), `meta.json`.
+- `data/sessions/<id>/` working data of one play-through: `consent.json`, `original.wav`, `raw/`, `clones/` (16 kHz), `meta.json`. Always deleted when the session ends.
+- `data/voice_samples/` the recordings kept with consent: `000000.wav`, `000001.wav`, ... and `index.csv` (see `voicebank.py`). Inside the repo folder, but `data/` is git-ignored, so recordings are never committed or pushed.
 
 ## Data and consent rules built in
 
-- The required box is needed to start; keeping the data for training is a separate box, off by default.
-- No retention consent: everything is deleted on Finish, or purged when the server starts if older than 24 h.
-- Delete on request: `DELETE /api/sessions/<code>`.
+- The required box is needed to start; keeping the recording for training is a separate box, off by default.
+- Keep-my-recording ticked: as soon as the recording passes the quality check it is copied to `data/voice_samples/` under the next number (starting at 0). `index.csv` holds the number, session code, times, consent wording version, length and checksum. Recording again replaces the file under the same number. Only the original recording is kept: the clones are not.
+- Not ticked: nothing is copied anywhere. The working recording is deleted on Finish.
+- Unfinished sessions (tab closed): the working folder is removed when the server starts if older than 24 h. A consenting participant's recording is already in the voice bank by then.
+- Delete on request: `DELETE /api/sessions/<code>` (works after Finish too) removes the saved recording and marks its index row `deleted`; the number is never reused. For the host: `python voicebank.py delete <code>` and `python voicebank.py list`.
 - The browser only sees neutral slot ids (`c1`, `c2`). Which engine made which clip is in `meta.json` and is not sent before the pick.
 - Placeholders to settle: the final sentence (`config.SENTENCE`), the contact for deletion (`config.CONTACT`), and sign-off on `consent.py`.
 
