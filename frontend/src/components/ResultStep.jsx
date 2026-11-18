@@ -4,7 +4,7 @@ import { VoiceCard } from "./VoiceCard";
 import { Confetti } from "./Confetti";
 import { cx } from "../lib/cx";
 
-export function ResultStep({ result, cardIds, player, sid, onFinish, onDelete }) {
+export function ResultStep({ result, cardIds, player, sid, retain, onFinish }) {
   const won = result.won;
   const [showScores, setShowScores] = useState(false);
   const [closing, setClosing] = useState("");
@@ -25,11 +25,11 @@ export function ResultStep({ result, cardIds, player, sid, onFinish, onDelete })
     return () => window.clearTimeout(timer);
   }, []);
 
-  async function run(kind) {
-    setClosing(kind);
+  async function finish() {
+    setClosing("finish");
     setError("");
     try {
-      await (kind === "delete" ? onDelete() : onFinish());
+      await onFinish();
     } catch (err) {
       setError(err.message);
       setClosing("");
@@ -95,11 +95,13 @@ export function ResultStep({ result, cardIds, player, sid, onFinish, onDelete })
         <p className="text-sm text-muted">
           Code <strong className="ml-1 rounded-lg bg-card px-2 py-1 font-mono text-sm text-ink ring-1 ring-line">{sid}</strong>
         </p>
+        <p className="max-w-md text-center text-sm text-muted">
+          {retain
+            ? "You agreed to keep your own recording. It is saved without your name when you finish. The copies are deleted."
+            : "You did not agree to keep your recording, so it is deleted with the copies when you finish."}
+        </p>
         <ErrorNote>{error}</ErrorNote>
-        <div className="flex flex-wrap justify-center gap-3">
-          <Button disabled={!!closing} onClick={() => run("delete")}>{closing === "delete" ? "Deleting…" : "Delete"}</Button>
-          <Button primary disabled={!!closing} onClick={() => run("finish")}>{closing === "finish" ? "Finishing…" : "Finish"}</Button>
-        </div>
+        <Button primary disabled={!!closing} onClick={finish}>{closing ? "Finishing…" : "Finish"}</Button>
       </footer>
     </div>
   );

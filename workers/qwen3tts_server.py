@@ -7,6 +7,7 @@ Listens on 127.0.0.1 only and handles one clone at a time. Loads the model once.
 import json
 import os
 import sys
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -21,20 +22,45 @@ import soundfile as sf  # noqa: E402
 import torch  # noqa: E402
 from qwen_tts import Qwen3TTSModel  # noqa: E402
 
+ATTN = "sdpa"
 if torch.cuda.is_available():
-    DEVICE, DTYPE = "cuda:0", torch.bfloat16
+    major, _minor = torch.cuda.get_device_capability()
+    if major >= 8:
+        # bfloat16 and the fast attention kernels exist from Ampere (8.0) up.
+        DEVICE, DTYPE, ATTN = "cuda:0", torch.bfloat16, "sdpa"
+    else:
+        # A T4 is Turing (7.5). Flash and memory-efficient attention abort there, and so can float16 sampling.
+        torch.backends.cuda.enable_flash_sdp(False)
+        torch.backends.cuda.enable_mem_efficient_sdp(False)
+        torch.backends.cuda.enable_math_sdp(True)
+        DEVICE, DTYPE, ATTN = "cuda:0", torch.float32, "eager"
 elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
     DEVICE, DTYPE = "mps", torch.float32     # float32: half precision on Apple GPUs can give garbled audio
 else:
     DEVICE, DTYPE = "cpu", torch.float32
-print(f"loading {config.QWEN_MODEL} on {DEVICE} ...", flush=True)
-t0 = time.time()
-try:
-    MODEL = Qwen3TTSModel.from_pretrained(config.QWEN_MODEL, device_map=DEVICE, dtype=DTYPE, attn_implementation="sdpa")
-except Exception as exc:  # noqa: BLE001
-    print("sdpa load failed, retrying with the default attention:", str(exc)[:150], flush=True)
-    MODEL = Qwen3TTSModel.from_pretrained(config.QWEN_MODEL, device_map=DEVICE, dtype=DTYPE)
-print(f"ready in {time.time() - t0:.0f}s", flush=True)
+MODEL = None
+LOAD_ERROR = None
+
+
+def load_model():
+    """Load after the port is open. A health check during the load then gets a reply instead of connection refused."""
+    global MODEL, ATTN, LOAD_ERROR
+    print(f"loading {config.QWEN_MODEL} on {DEVICE} ({DTYPE}, {ATTN}) ...", flush=True)
+    t0 = time.time()
+    try:
+        try:
+            MODEL = Qwen3TTSModel.from_pretrained(config.QWEN_MODEL, device_map=DEVICE, dtype=DTYPE, attn_implementation=ATTN)
+        except Exception as exc:  # noqa: BLE001
+            print("attention load failed, retrying with the default attention:", str(exc)[:150], flush=True)
+            ATTN = "default"
+            MODEL = Qwen3TTSModel.from_pretrained(config.QWEN_MODEL, device_map=DEVICE, dtype=DTYPE)
+        print(f"ready in {time.time() - t0:.0f}s", flush=True)
+    except Exception as exc:  # noqa: BLE001
+        LOAD_ERROR = f"{type(exc).__name__}: {exc}"
+        print("model load failed:", LOAD_ERROR, flush=True)
+
+
+threading.Thread(target=load_model, daemon=True).start()
 
 
 def token_budget(text: str) -> int:
@@ -53,11 +79,17 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        self._send(200, {"ready": True, "device": DEVICE}) if self.path == "/health" else self._send(404, {"error": "not found"})
+        if self.path != "/health":
+            return self._send(404, {"error": "not found"})
+        if MODEL is None:
+            return self._send(503, {"ready": False, "error": LOAD_ERROR or "loading"})
+        self._send(200, {"ready": True, "device": DEVICE, "dtype": str(DTYPE).removeprefix("torch."), "attn": ATTN})
 
     def do_POST(self):
         if self.path != "/clone":
             return self._send(404, {"error": "not found"})
+        if MODEL is None:
+            return self._send(503, {"ok": False, "error": LOAD_ERROR or "still loading"})
         try:
             job = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
             t = time.time()
@@ -75,4 +107,4 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
-HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+HTTPServer((os.environ.get("QWEN_HOST", "127.0.0.1"), PORT), Handler).serve_forever()

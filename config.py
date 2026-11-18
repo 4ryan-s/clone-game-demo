@@ -70,7 +70,7 @@ PLAY_TARGET_RMS_DBFS = -23.0
 PLAY_PAD_SECONDS = 0.2
 
 # Local engines. Each runs as a small always-on worker in its own environment and keeps its model loaded on the GPU.
-QWEN_URL = "http://127.0.0.1:8766"
+QWEN_URL = os.environ.get("QWEN_URL", "http://127.0.0.1:8766")
 QWEN_PYTHON = venv_python("qwen")
 QWEN_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"        # Hugging Face id, downloaded into MODELS_DIR/hf by setup.py
 QWEN_TIMEOUT_S = 120
