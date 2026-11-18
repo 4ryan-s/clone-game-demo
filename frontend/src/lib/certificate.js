@@ -1,8 +1,14 @@
-// Draws a shareable certificate PNG on a canvas. Everything is client-side so
-// the participant gets the image instantly and can save or share it.
+// Draws a shareable, Instagram-story-sized (1080x1920, 9:16) certificate PNG on
+// a canvas. Everything is client-side so the participant gets it instantly.
 const LOGO_SRC = "/josh-logo.png";
 const EVENT = "Real or Clone \u2014 The Voice Challenge";
+const BODY = "You identified your own original voice from the best AI-cloned model voices.";
 const GOODIE = "Collect your goodie from the booth by showing this certificate.";
+
+const INK = "#1c1915";
+const MUTED = "#6f685f";
+const ACCENT = "#0f6f5b";
+const GOLD = "#a67912";
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
@@ -56,16 +62,44 @@ function drawStar(ctx, cx, cy, spikes, outer, inner, color) {
     ctx.lineTo(cx + Math.cos(rot) * inner, cy + Math.sin(rot) * inner);
     rot += step;
   }
-  ctx.lineTo(cx, cy - outer);
   ctx.closePath();
   ctx.fillStyle = color;
   ctx.fill();
 }
 
-// Returns { blob, dataUrl }. `won` picks the accent colour and wording.
-export async function buildCertificate({ won, name, code, date }) {
-  const W = 1600;
-  const H = 1000;
+function drawBadge(ctx, cx, cy, r) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = "#f8e7b0";
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 14, 0, Math.PI * 2);
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = GOLD;
+  ctx.stroke();
+  drawStar(ctx, cx, cy, 5, r * 0.55, r * 0.26, GOLD);
+}
+
+function confetti(ctx, W) {
+  const colors = [ACCENT, GOLD, "#c4493a", "#157a45"];
+  const dots = [
+    [120, 300], [220, 210], [900, 250], [980, 360], [160, 470],
+    [940, 500], [90, 1700], [980, 1680], [150, 1840], [930, 1860],
+  ];
+  dots.forEach(([x, y], i) => {
+    ctx.beginPath();
+    ctx.arc(Math.min(x, W - 40), y, 12, 0, Math.PI * 2);
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.globalAlpha = 0.5;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  });
+}
+
+// Returns { blob, dataUrl }.
+export async function buildCertificate({ code, date }) {
+  const W = 1080;
+  const H = 1920;
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
@@ -77,92 +111,83 @@ export async function buildCertificate({ won, name, code, date }) {
     // custom fonts just fall back to the generic family
   }
 
-  const accent = won ? "#0f6f5b" : "#a67912";
-
   // Background and borders.
   ctx.fillStyle = "#faf7f0";
   ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 16;
-  ctx.strokeRect(30, 30, W - 60, H - 60);
+  confetti(ctx, W);
+  ctx.strokeStyle = ACCENT;
+  ctx.lineWidth = 18;
+  ctx.strokeRect(36, 36, W - 72, H - 72);
   ctx.strokeStyle = "#d9cfbd";
   ctx.lineWidth = 3;
-  ctx.strokeRect(56, 56, W - 112, H - 112);
+  ctx.strokeRect(66, 66, W - 132, H - 132);
 
   // Logo.
   try {
     const logo = await loadImage(LOGO_SRC);
-    const lw = 200;
+    const lw = 300;
     const lh = (logo.height * lw) / logo.width;
-    ctx.drawImage(logo, (W - lw) / 2, 92, lw, lh);
+    ctx.drawImage(logo, (W - lw) / 2, 150, lw, lh);
   } catch {
     // no logo available; carry on
   }
 
   ctx.textAlign = "center";
 
-  // Title.
-  ctx.fillStyle = "#1c1915";
-  ctx.font = "700 74px 'Fraunces', Georgia, serif";
-  ctx.fillText("Certificate of Participation", W / 2, 360);
-
-  // Event subtitle.
-  ctx.fillStyle = "#6f685f";
+  // Label.
+  ctx.fillStyle = MUTED;
   ctx.font = "600 30px 'Outfit', system-ui, sans-serif";
-  ctx.fillText(EVENT, W / 2, 410);
+  ctx.fillText("C E R T I F I C A T E   O F   A C H I E V E M E N T", W / 2, 560);
+
+  // Headline.
+  ctx.fillStyle = ACCENT;
+  ctx.font = "700 96px 'Fraunces', Georgia, serif";
+  ctx.fillText("Congratulations!", W / 2, 680);
 
   // Divider.
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 4;
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 5;
   ctx.beginPath();
-  ctx.moveTo(W / 2 - 90, 440);
-  ctx.lineTo(W / 2 + 90, 440);
+  ctx.moveTo(W / 2 - 90, 724);
+  ctx.lineTo(W / 2 + 90, 724);
   ctx.stroke();
 
-  // "Awarded to".
-  ctx.fillStyle = "#6f685f";
-  ctx.font = "600 24px 'Outfit', system-ui, sans-serif";
-  ctx.fillText("A W A R D E D   T O", W / 2, 500);
-
-  // Name.
-  ctx.fillStyle = accent;
-  ctx.font = "700 58px 'Fraunces', Georgia, serif";
-  ctx.fillText(name || "Valued Participant", W / 2, 566);
-
-  // Result sentence.
-  ctx.fillStyle = "#1c1915";
-  ctx.font = "400 34px 'Outfit', system-ui, sans-serif";
-  const sentence = won
-    ? "For spotting their own real voice among lifelike AI voice clones."
-    : "For taking on lifelike AI voice clones in the voice challenge.";
-  const lines = wrapLines(ctx, sentence, W - 360);
-  let y = 628;
+  // Body.
+  ctx.fillStyle = INK;
+  ctx.font = "400 46px 'Outfit', system-ui, sans-serif";
+  const lines = wrapLines(ctx, BODY, W - 220);
+  let y = 820;
   for (const line of lines) {
     ctx.fillText(line, W / 2, y);
-    y += 46;
+    y += 62;
   }
 
-  // Goodie message box.
-  const boxW = 1120;
-  const boxH = 104;
-  const boxX = (W - boxW) / 2;
-  const boxY = 724;
-  ctx.fillStyle = won ? "#e4f5ea" : "#f6e7b6";
-  roundRect(ctx, boxX, boxY, boxW, boxH, 24);
-  ctx.fill();
-  drawStar(ctx, boxX + 54, boxY + boxH / 2, 5, 22, 10, accent);
-  drawStar(ctx, boxX + boxW - 54, boxY + boxH / 2, 5, 22, 10, accent);
-  ctx.fillStyle = "#1c1915";
-  ctx.font = "700 30px 'Outfit', system-ui, sans-serif";
-  ctx.fillText(GOODIE, W / 2, boxY + boxH / 2 + 11);
+  // Badge.
+  drawBadge(ctx, W / 2, 1230, 170);
 
-  // Footer: code and date.
-  ctx.fillStyle = "#6f685f";
-  ctx.font = "600 26px 'Outfit', system-ui, sans-serif";
-  ctx.textAlign = "left";
-  ctx.fillText(`Code  ${code}`, 140, 912);
-  ctx.textAlign = "right";
-  ctx.fillText(date, W - 140, 912);
+  // Goodie box.
+  const boxW = W - 180;
+  const boxH = 180;
+  const boxX = 90;
+  const boxY = 1470;
+  ctx.fillStyle = "#e4f5ea";
+  roundRect(ctx, boxX, boxY, boxW, boxH, 28);
+  ctx.fill();
+  ctx.fillStyle = INK;
+  ctx.font = "700 38px 'Outfit', system-ui, sans-serif";
+  const goodieLines = wrapLines(ctx, GOODIE, boxW - 100);
+  let gy = boxY + boxH / 2 - (goodieLines.length - 1) * 26 + 12;
+  for (const line of goodieLines) {
+    ctx.fillText(line, W / 2, gy);
+    gy += 52;
+  }
+
+  // Footer.
+  ctx.fillStyle = MUTED;
+  ctx.font = "600 32px 'Outfit', system-ui, sans-serif";
+  ctx.fillText(EVENT, W / 2, 1744);
+  ctx.font = "600 28px 'Outfit', system-ui, sans-serif";
+  ctx.fillText(`Code ${code}   \u2022   ${date}`, W / 2, 1800);
 
   const dataUrl = canvas.toDataURL("image/png");
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));

@@ -85,7 +85,7 @@ export function ResultStep({ result, cardIds, sid, retain, onFinish }) {
       </div>
 
       <footer className="flex flex-col items-center gap-4 pt-1">
-        {won && <CertificateCard sid={sid} won={won} />}
+        {won && <CertificateCard sid={sid} />}
         <p className="text-sm text-muted">
           Code <strong className="ml-1 rounded-lg bg-card px-2 py-1 font-mono text-sm text-ink ring-1 ring-line">{sid}</strong>
         </p>
