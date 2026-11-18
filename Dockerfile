@@ -24,5 +24,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
        fi
 COPY . .
 COPY --from=quiz /src/dist ./frontend/dist
+COPY docker/api-entrypoint.sh /entrypoint.sh
 EXPOSE 8000
+ENTRYPOINT ["sh", "/entrypoint.sh"]
 CMD ["python", "-m", "uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]

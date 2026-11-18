@@ -37,7 +37,9 @@ def _load():
         sess = ort.InferenceSession(str(config.SPECTRA_ONNX), providers=_providers())
         active = sess.get_providers()[0]
         if os.environ.get("SPECTRA_DEVICE") == "cuda" and active != "CUDAExecutionProvider":
-            raise RuntimeError(f"Spectra did not load on the GPU (got {active})")
+            raise RuntimeError(
+                f"Spectra did not load on the GPU (got {active}; available {ort.get_available_providers()})"
+            )
         _sess = sess
         _provider = active
         log.info("clone check ready on %s", active)
