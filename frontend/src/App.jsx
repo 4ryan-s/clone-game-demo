@@ -3,6 +3,7 @@ import { api } from "./lib/api";
 import { usePlayer } from "./hooks/usePlayer";
 import { Shell } from "./components/Shell";
 import { Boot } from "./components/Boot";
+import { StartStep } from "./components/StartStep";
 import { ConsentStep } from "./components/ConsentStep";
 import { RecordStep } from "./components/RecordStep";
 import { MakingStep } from "./components/MakingStep";
@@ -10,17 +11,22 @@ import { GameStep } from "./components/GameStep";
 import { ResultStep } from "./components/ResultStep";
 import { ByeStep } from "./components/ByeStep";
 
+// Two flows share the same cards, game and result screens:
+//   static (cfg.static): Start -> Pick -> Reward. The voices and clones were made ahead of time; Start picks a random person.
+//   live: consent -> record -> clones are made -> Pick -> Reward.
 export default function App() {
   const [phase, setPhase] = useState("loading");
   const [bootError, setBootError] = useState("");
   const [cfg, setCfg] = useState(null);
   const [sid, setSid] = useState(null);
+  const [round, setRound] = useState(null); // static flow: { id, name, text }
   const [retain, setRetain] = useState(false);
   const [cardIds, setCardIds] = useState([]);
   const [result, setResult] = useState(null);
   const [bye, setBye] = useState({ title: "", text: "" });
   const handedOff = useRef(false);
-  const player = usePlayer(sid);
+  const isStatic = !!(cfg && cfg.static);
+  const player = usePlayer(isStatic ? (round ? `/api/rounds/${round.id}` : null) : sid ? `/api/sessions/${sid}` : null);
 
   const init = useCallback(async () => {
     setPhase("loading");
@@ -28,7 +34,7 @@ export default function App() {
     try {
       const next = await api("/api/config");
       setCfg(next);
-      setPhase("consent");
+      setPhase(next.static ? "start" : "consent");
     } catch (err) {
       setBootError(err.message);
       setPhase("error");
@@ -43,6 +49,7 @@ export default function App() {
     player.stop();
     handedOff.current = false;
     setSid(null);
+    setRound(null);
     setRetain(false);
     setCardIds([]);
     setResult(null);
@@ -50,6 +57,24 @@ export default function App() {
     init();
   }
 
+  // ---- static flow
+  async function startRound() {
+    const started = await api("/api/static/rounds", { method: "POST" });
+    setRound({ id: started.round_id, name: started.name, text: started.text });
+    setCardIds(started.cards);
+    setResult(null);
+    setPhase("game");
+  }
+
+  function playAgain() {
+    player.stop();
+    setRound(null);
+    setCardIds([]);
+    setResult(null);
+    setPhase("start");
+  }
+
+  // ---- live flow
   async function agree({ retain: keep }) {
     const created = await api("/api/sessions", {
       method: "POST",
@@ -87,7 +112,8 @@ export default function App() {
   }
 
   async function lock(card) {
-    const reveal = await api(`/api/sessions/${sid}/pick`, {
+    const path = isStatic ? `/api/rounds/${round.id}/pick` : `/api/sessions/${sid}/pick`;
+    const reveal = await api(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ card }),
@@ -132,7 +158,8 @@ export default function App() {
   }
 
   return (
-    <Shell phase={phase}>
+    <Shell phase={phase} isStatic={isStatic}>
+      {phase === "start" && <StartStep onStart={startRound} sets={cfg.static_sets ?? 1} />}
       {phase === "consent" && <ConsentStep consent={cfg.consent} onAgree={agree} />}
       {phase === "record" && (
         <RecordStep sentence={cfg.sentence} maxSeconds={cfg.max_seconds} onSubmit={submitRecording} />
@@ -140,7 +167,16 @@ export default function App() {
       {phase === "making" && (
         <MakingStep sid={sid} cloneCount={cfg.clone_count} onReady={copiesReady} />
       )}
-      {phase === "game" && <GameStep cardIds={cardIds} player={player} onLock={lock} />}
+      {phase === "game" && (
+        <GameStep
+          cardIds={cardIds}
+          player={player}
+          onLock={lock}
+          title={isStatic ? `Which one is really ${round.name}?` : undefined}
+          subtitle={isStatic ? `They all say: “${round.text}”` : ""}
+          pickLabel={isStatic ? "This is the real voice" : undefined}
+        />
+      )}
       {phase === "result" && result && (
         <ResultStep
           result={result}
@@ -150,6 +186,8 @@ export default function App() {
           sid={sid}
           onFinish={finish}
           onDelete={remove}
+          name={isStatic ? result.name : ""}
+          onAgain={isStatic ? playAgain : undefined}
         />
       )}
     </Shell>

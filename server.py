@@ -20,6 +20,7 @@ import config
 import engines
 import game
 import pipeline
+import staticset
 import scoring
 import store
 import voicebank
@@ -34,7 +35,8 @@ DEBUG = os.environ.get("DEMO_DEBUG") == "1"
 @asynccontextmanager
 async def lifespan(_app):
     config.SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
-    scoring.warm_up()          # loads the 1.2 GB clone-check model in the background so the reveal is quick
+    if not config.STATIC_MODE:
+        scoring.warm_up()      # loads the 1.2 GB clone-check model in the background so the reveal is quick (static mode scores ahead of time)
     n = store.purge_stale()
     if n:
         log.info("removed %d unfinished working sessions older than 24 h", n)
@@ -51,7 +53,7 @@ def _need(sid: str) -> None:
 
 @app.get("/api/config")
 def get_config():
-    return {"sentence": config.SENTENCE, "consent": CONSENT, "clone_count": len(engines.enabled()),
+    return {"static": config.STATIC_MODE, "static_sets": staticset.summary()["sets"] if config.STATIC_MODE else 0, "sentence": config.SENTENCE, "consent": CONSENT, "clone_count": len(engines.enabled()),
             "min_seconds": config.MIN_SECONDS, "max_seconds": config.MAX_SECONDS}
 
 
@@ -190,11 +192,43 @@ def delete_session(sid: str):
 @app.get("/api/health")
 def health():
     """For the person running the demo: is every engine ready? (Shows engine names; keep this off the participant's screen.)"""
+    if config.STATIC_MODE:
+        info = staticset.summary()
+        return {"static_set": {"ready": info["sets"] > 0, "sets": info["sets"], "people": info["people"],
+                               "reason": "" if info["sets"] else "no sets built: run tools/build_static_set.py"}}
     out = {}
     for e in engines.enabled():
         ok, why = e.available()
         out[e.name] = {"ready": ok, "reason": why}
     return out
+
+
+# ------------------------------------------------------------- static game (STATIC_MODE): rounds made from sets built ahead of time
+@app.post("/api/static/rounds")
+def static_start():
+    """The Start button: pick a random person and shuffle their real clip with its clones into cards."""
+    if not config.STATIC_MODE:
+        raise HTTPException(404, "Static mode is off")
+    try:
+        return staticset.start_round()
+    except LookupError as exc:
+        raise HTTPException(503, str(exc))
+
+
+@app.get("/api/rounds/{rid}/cards/{card}.wav")
+def static_card_audio(rid: str, card: str):
+    data = staticset.playback_wav(rid, card)
+    if data is None:
+        raise HTTPException(404, "Unknown card")
+    return Response(data, media_type="audio/wav", headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/rounds/{rid}/pick")
+def static_pick(rid: str, body: PickIn):
+    result = staticset.pick(rid, body.card)
+    if result is None:
+        raise HTTPException(404, "Unknown round or card")
+    return result
 
 
 if DEBUG:

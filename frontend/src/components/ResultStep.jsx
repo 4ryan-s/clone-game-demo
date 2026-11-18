@@ -4,7 +4,7 @@ import { VoiceCard } from "./VoiceCard";
 import { Confetti } from "./Confetti";
 import { cx } from "../lib/cx";
 
-export function ResultStep({ result, cardIds, player, sid, onFinish, onDelete }) {
+export function ResultStep({ result, cardIds, player, sid, onFinish, onDelete, name = "", onAgain }) {
   const won = result.won;
   const [showScores, setShowScores] = useState(false);
   const [closing, setClosing] = useState("");
@@ -18,6 +18,8 @@ export function ResultStep({ result, cardIds, player, sid, onFinish, onDelete })
   const clones = ordered.filter((card) => !card.real);
   const real = ordered.find((card) => card.real);
   const shown = real ? [...clones, real] : ordered;
+  // Static demo: the real voice belongs to a named person, not to the player.
+  const wasLine = real ? (name ? `Voice ${real.letter} was ${name}'s real voice.` : `Voice ${real.letter} was yours.`) : "That was a copy.";
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -54,7 +56,7 @@ export function ResultStep({ result, cardIds, player, sid, onFinish, onDelete })
             {won ? "Congratulations" : "A copy fooled you"}
           </h1>
           <p className="mt-3 text-lg text-muted">
-            {won ? "That was your voice." : real ? `Voice ${real.letter} was yours.` : "That was a copy."}
+            {won ? (name ? `That was ${name}'s real voice.` : "That was your voice.") : wasLine}
           </p>
           <div className="mt-8">{won ? <Medal /> : <ScorecardMark />}</div>
           <Button primary className="mt-8 w-full max-w-xs sm:mt-10 sm:w-auto sm:min-w-52" onClick={() => setShowScores(true)}>See the copies</Button>
@@ -66,8 +68,9 @@ export function ResultStep({ result, cardIds, player, sid, onFinish, onDelete })
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div className="text-center">
-        <h1 className="font-display text-3xl leading-tight text-balance sm:text-4xl">{won ? "You found your voice" : "A copy fooled you"}</h1>
-        {real && <p className="mt-2 text-muted">Voice {real.letter} was yours.</p>}
+        <h1 className="font-display text-3xl leading-tight text-balance sm:text-4xl">{won ? (name ? "You found the real voice" : "You found your voice") : "A copy fooled you"}</h1>
+        {real && <p className="mt-2 text-muted">{wasLine}</p>}
+        {result.text ? <p className="mt-1 text-sm text-muted">They all said: “{result.text}”</p> : null}
       </div>
 
       <div className="grid grid-cols-4 gap-3">
@@ -78,6 +81,7 @@ export function ResultStep({ result, cardIds, player, sid, onFinish, onDelete })
               playing={player.playingId === card.card}
               progress={player.progress}
               onPlay={() => play(card.card)}
+              realLabel={name ? `${name}'s real voice` : undefined}
               reveal={{
                 real: card.real,
                 who: card.who,
@@ -92,14 +96,20 @@ export function ResultStep({ result, cardIds, player, sid, onFinish, onDelete })
       </div>
 
       <footer className="flex flex-col items-center gap-4 pt-1">
-        <p className="text-sm text-muted">
-          Code <strong className="ml-1 rounded-lg bg-card px-2 py-1 font-mono text-sm text-ink ring-1 ring-line">{sid}</strong>
-        </p>
         <ErrorNote>{error}</ErrorNote>
-        <div className="flex flex-wrap justify-center gap-3">
-          <Button disabled={!!closing} onClick={() => run("delete")}>{closing === "delete" ? "Deleting…" : "Delete"}</Button>
-          <Button primary disabled={!!closing} onClick={() => run("finish")}>{closing === "finish" ? "Finishing…" : "Finish"}</Button>
-        </div>
+        {onAgain ? (
+          <Button primary className="min-w-52" onClick={onAgain}>Play again</Button>
+        ) : (
+          <>
+            <p className="text-sm text-muted">
+              Code <strong className="ml-1 rounded-lg bg-card px-2 py-1 font-mono text-sm text-ink ring-1 ring-line">{sid}</strong>
+            </p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Button disabled={!!closing} onClick={() => run("delete")}>{closing === "delete" ? "Deleting…" : "Delete"}</Button>
+              <Button primary disabled={!!closing} onClick={() => run("finish")}>{closing === "finish" ? "Finishing…" : "Finish"}</Button>
+            </div>
+          </>
+        )}
       </footer>
     </div>
   );

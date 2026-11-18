@@ -1,7 +1,7 @@
 import { Logo } from "./Logo";
 import { cx } from "../lib/cx";
 
-const ROUNDS = [
+const LIVE_ROUNDS = [
   { id: "consent", label: "Agree" },
   { id: "record", label: "Record" },
   { id: "making", label: "Hang on" },
@@ -9,7 +9,15 @@ const ROUNDS = [
   { id: "result", label: "Reward" },
 ];
 
-export function Shell({ phase, children }) {
+// The static demo has no consent, recording or waiting steps: Start, then Pick, then Reward.
+const STATIC_ROUNDS = [
+  { id: "start", label: "Start" },
+  { id: "game", label: "Pick" },
+  { id: "result", label: "Reward" },
+];
+
+export function Shell({ phase, children, isStatic = false }) {
+  const ROUNDS = isStatic ? STATIC_ROUNDS : LIVE_ROUNDS;
   const current = ROUNDS.findIndex((round) => round.id === phase);
   const round = ROUNDS[current] || ROUNDS[0];
 

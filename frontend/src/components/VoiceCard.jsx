@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { cx } from "../lib/cx";
 import { formatMargin, scorePercent } from "../lib/score";
 
-export function VoiceCard({ letter, playing, progress, onPlay, selected, onPick, heard, reveal }) {
+export function VoiceCard({ letter, playing, progress, onPlay, selected, onPick, heard, reveal, pickLabel = "This one is me", realLabel = "Your real voice" }) {
   const [slid, setSlid] = useState(false);
   useEffect(() => {
     if (!reveal) return undefined;
@@ -50,7 +50,7 @@ export function VoiceCard({ letter, playing, progress, onPlay, selected, onPick,
               "inline-flex max-w-full rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white",
               reveal.real ? "bg-good" : "bg-bad",
             )}>
-              {reveal.real ? "Your real voice" : `Clone: ${reveal.who}`}
+              {reveal.real ? realLabel : `Clone: ${reveal.who}`}
             </span>
             <p className="mt-1.5 min-h-4 text-xs text-muted">{reveal.picked ? "You picked this one" : "\u00a0"}</p>
             <div className="mt-1 flex flex-wrap items-end justify-between gap-1">
@@ -84,7 +84,7 @@ export function VoiceCard({ letter, playing, progress, onPlay, selected, onPick,
               selected ? "border-accent bg-accent text-white" : "border-line bg-white text-ink hover:border-accent",
             )}
           >
-            {selected ? "✓ Selected" : heard ? "This one is me" : "Play to choose"}
+            {selected ? "✓ Selected" : heard ? pickLabel : "Play to choose"}
           </button>
         </div>
       )}

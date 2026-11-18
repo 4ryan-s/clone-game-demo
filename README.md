@@ -4,6 +4,32 @@ A participant reads one fixed sentence. The demo makes copies of that voice, mix
 
 This is a standalone project. It does not use or modify the voice-banking repositories, except that the clone check reads the Spectra model from a folder you point at.
 
+## Static demo (this branch)
+
+`config.STATIC_MODE = True`: nothing is recorded or cloned while people play. The voices and their clones are made ahead of time, and the game only plays them back.
+
+Flow: one start page with a **Start** button, which picks a random person, then the same listening game (four shuffled cards: one real clip, one Sarvam clone, one Sarvam clone with other settings, one Qwen3-TTS clone, all saying the same words), then the result with the clone-check score of each voice and a **Play again** button.
+
+**Adding voices.** Put each person's files under `data/static_sources/` (git-ignored, these are real people's voices):
+
+```
+data/static_sources/<person>/reference.wav          10 to 15 s of that person speaking; the clones copy this (reference.txt = what they say, optional)
+data/static_sources/<person>/originals/<clip>.wav   the real clip shown in the game; it must NOT be part of reference.wav (<clip>.txt = its words, optional)
+```
+
+Then build (needs `SARVAM_API_KEY`, the Qwen3-TTS worker running, and the clone-check model):
+
+```
+python workers/qwen3tts_server.py        # in the qwen environment, leave it running
+python tools/build_static_set.py         # builds every original that has no set yet; --only <person>, --force to redo
+```
+
+Without a `.txt` file the words are transcribed with Whisper and saved next to the clip, so they can be corrected by hand and rebuilt with `--force`. Each built set lands in `data/static_set/<person>_<clip>/` (original, three clones, `set.json` with the scores). The server reads those folders when a round starts, so new sets appear without a restart.
+
+**Serving it needs far less than the live version**: no GPU, no cloning engine, no clone-check model (scores are stored in each set). Run `python -m uvicorn server:app --host 127.0.0.1 --port 8000` with the built `frontend/dist`. `data/static_set/` is git-ignored: copy it to another machine yourself.
+
+Check a running server with `python tests/smoke_static.py`. The live consent, recording and cloning flow is still in the code and runs when `STATIC_MODE = False`.
+
 ## Download
 
 ```bash

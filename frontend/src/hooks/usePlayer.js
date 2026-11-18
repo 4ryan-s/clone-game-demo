@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export function usePlayer(sid) {
+// `base` is the API path that serves the cards, for example /api/sessions/<id> or /api/rounds/<id>.
+export function usePlayer(base) {
   const audioRef = useRef(null);
   const playingRef = useRef(null);
   const [playingId, setPlayingId] = useState(null);
@@ -38,7 +39,7 @@ export function usePlayer(sid) {
 
   const toggle = useCallback((id) => {
     const audio = audioRef.current;
-    if (!audio || !sid) return Promise.resolve();
+    if (!audio || !base) return Promise.resolve();
     if (playingRef.current === id) {
       stop();
       return Promise.resolve();
@@ -47,7 +48,7 @@ export function usePlayer(sid) {
     setProgress(0);
     playingRef.current = id;
     setPlayingId(id);
-    audio.src = `/api/sessions/${sid}/cards/${id}.wav`;
+    audio.src = `${base}/cards/${id}.wav`;
     return audio.play().catch((err) => {
       if (err && err.name === "AbortError") return;
       if (playingRef.current === id) {
@@ -57,7 +58,7 @@ export function usePlayer(sid) {
       }
       throw err;
     });
-  }, [sid, stop]);
+  }, [base, stop]);
 
   return { playingId, progress, toggle, stop };
 }

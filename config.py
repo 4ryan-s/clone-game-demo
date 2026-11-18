@@ -32,6 +32,10 @@ _load_env()
 
 SESSIONS_DIR = ROOT / "data" / "sessions"                # working data of one play-through; deleted when it ends
 VOICE_SAMPLES_DIR = ROOT / "data" / "voice_samples"      # numbered recordings kept with consent (see voicebank.py); data/ is git-ignored
+# Static demo (this branch): the voices and clones are made ahead of time by tools/build_static_set.py and only played back.
+STATIC_MODE = True
+STATIC_SOURCES_DIR = ROOT / "data" / "static_sources"    # real people's reference and original clips (git-ignored)
+STATIC_SET_DIR = ROOT / "data" / "static_set"            # built sets: original + clones + scores, one folder each (git-ignored)
 MODELS_DIR = ROOT / "models"       # downloaded by setup.py (not in git: several GB)
 VENVS_DIR = ROOT / ".venvs"        # one Python environment per local engine, created by setup.py
 

@@ -41,8 +41,12 @@ def find_card(sid: str, card_id: str) -> dict | None:
 
 
 def playback_wav(sid: str, card: dict) -> bytes:
+    return playback_from_file(_clip_path(sid, card))
+
+
+def playback_from_file(path) -> bytes:
     """What the participant hears: same format, same loudness, same lead and tail silence for every card."""
-    x, sr = sf.read(str(_clip_path(sid, card)), dtype="float32")
+    x, sr = sf.read(str(path), dtype="float32")
     x = audio.to_16k(x if x.ndim == 1 else x.mean(axis=1), sr)
     frame = 320                                                  # 20 ms
     n = len(x) // frame

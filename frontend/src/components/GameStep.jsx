@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button, ErrorNote, StepHead } from "./ui";
 import { VoiceCard } from "./VoiceCard";
 
-export function GameStep({ cardIds, player, onLock }) {
+export function GameStep({ cardIds, player, onLock, title = "Which one is you?", subtitle = "", pickLabel }) {
   const [picked, setPicked] = useState(null);
   const [heard, setHeard] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -33,7 +33,8 @@ export function GameStep({ cardIds, player, onLock }) {
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col">
-      <StepHead title="Which one is you?" />
+      <StepHead title={title} />
+      {subtitle ? <p className="mx-auto mt-2 max-w-xl text-center text-muted">{subtitle}</p> : null}
 
       <div className="mt-7 grid w-full grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
         {cardIds.map((id, index) => (
@@ -45,6 +46,7 @@ export function GameStep({ cardIds, player, onLock }) {
               onPlay={() => play(id)}
               selected={picked === id}
               heard={heard.includes(id)}
+              pickLabel={pickLabel}
               onPick={() => setPicked(id)}
             />
           </div>
