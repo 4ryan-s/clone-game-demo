@@ -1,0 +1,23 @@
+# Qwen3-TTS worker. TORCH_VARIANT=cu128 (NVIDIA) or cpu.
+FROM python:3.12-slim-bookworm
+ARG TORCH_VARIANT=cu128
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    QWEN_HOST=0.0.0.0 \
+    HF_HOME=/app/models/hf
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY requirements/qwen.txt /tmp/qwen.txt
+RUN python -m pip install --upgrade pip \
+    && if [ "$TORCH_VARIANT" = "cpu" ]; then \
+         pip install --no-cache-dir torch==2.11.0 torchaudio==2.11.0; \
+       else \
+         pip install --no-cache-dir torch==2.11.0 torchaudio==2.11.0 --index-url "https://download.pytorch.org/whl/${TORCH_VARIANT}"; \
+       fi \
+    && pip install --no-cache-dir -r /tmp/qwen.txt
+COPY . .
+EXPOSE 8766
+CMD ["python", "workers/qwen3tts_server.py"]

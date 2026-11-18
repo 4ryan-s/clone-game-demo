@@ -1,0 +1,16 @@
+.git
+.venv
+.venvs
+models
+data
+logs
+third_party
+**/__pycache__
+**/*.pyc
+**/.DS_Store
+frontend/node_modules
+frontend/dist
+.env
+local_config.py
+*.log
+*.wav

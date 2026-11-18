@@ -1,0 +1,63 @@
+# Quiz and API on port 8000, Qwen3-TTS worker beside it.
+# Models and recordings stay on the host (./models and ./data), not in the image.
+#
+#   cp .env.example .env          # set SARVAM_API_KEY
+#   docker compose build
+#   docker compose run --rm --no-deps qwen python docker/download_models.py
+#   docker compose up -d
+#
+# No NVIDIA GPU: docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d --build
+# Public HTTPS (microphone): docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
+
+services:
+  qwen:
+    build:
+      context: .
+      dockerfile: Dockerfile.qwen
+      args:
+        TORCH_VARIANT: ${TORCH_VARIANT:-cu128}
+    environment:
+      QWEN_HOST: 0.0.0.0
+      QWEN_PORT: "8766"
+      HF_HOME: /app/models/hf
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8766/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 180s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      QWEN_URL: http://qwen:8766
+      SARVAM_API_KEY: ${SARVAM_API_KEY:-}
+      HF_HOME: /app/models/hf
+    ports:
+      - "${DEMO_PORT:-8000}:8000"
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+    depends_on:
+      qwen:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
+      interval: 15s
+      timeout: 8s
+      retries: 8
+      start_period: 20s

@@ -1,0 +1,24 @@
+# Puts Caddy in front of the API so the quiz is served over HTTPS.
+# Browsers block the microphone on a plain http:// address that is not localhost.
+# Point DEMO_DOMAIN in .env at a name that resolves to this machine, and open ports 80 and 443.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DEMO_DOMAIN: ${DEMO_DOMAIN:-localhost}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  caddy_data:
+  caddy_config:
