@@ -9,8 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@wavesurfer/react": "^1.0.14",
+    "qrcode.react": "^4.2.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "wavesurfer.js": "^8.1.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.12",

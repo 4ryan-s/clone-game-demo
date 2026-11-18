@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { Button, ErrorNote } from "./ui";
 import { VoiceCard } from "./VoiceCard";
+import { CertificateCard } from "./CertificateCard";
 import { Confetti } from "./Confetti";
 import { cx } from "../lib/cx";
 
-export function ResultStep({ result, cardIds, player, sid, retain, onFinish }) {
+export function ResultStep({ result, cardIds, sid, retain, onFinish }) {
   const won = result.won;
   const [showScores, setShowScores] = useState(false);
+  const [active, setActive] = useState(null);
   const [closing, setClosing] = useState("");
   const [error, setError] = useState("");
   const ordered = (cardIds.length ? cardIds : result.cards.map((card) => card.card))
@@ -15,9 +17,8 @@ export function ResultStep({ result, cardIds, player, sid, retain, onFinish }) {
       return card ? { ...card, letter: String.fromCharCode(65 + index) } : null;
     })
     .filter(Boolean);
-  const clones = ordered.filter((card) => !card.real);
   const real = ordered.find((card) => card.real);
-  const shown = real ? [...clones, real] : ordered;
+  const shown = ordered;
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -33,14 +34,6 @@ export function ResultStep({ result, cardIds, player, sid, retain, onFinish }) {
     } catch (err) {
       setError(err.message);
       setClosing("");
-    }
-  }
-
-  async function play(id) {
-    try {
-      await player.toggle(id);
-    } catch {
-      setError("The audio could not be played. Try again.");
     }
   }
 
@@ -70,14 +63,14 @@ export function ResultStep({ result, cardIds, player, sid, retain, onFinish }) {
         {real && <p className="mt-2 text-muted">Voice {real.letter} was yours.</p>}
       </div>
 
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {shown.map((card, index) => (
           <div key={card.card} className="rise min-h-0 min-w-0" style={{ animationDelay: `${index * 80}ms` }}>
             <VoiceCard
               letter={card.letter}
-              playing={player.playingId === card.card}
-              progress={player.progress}
-              onPlay={() => play(card.card)}
+              src={`/api/sessions/${sid}/cards/${card.card}.wav`}
+              active={active === card.card}
+              onStart={() => setActive(card.card)}
               reveal={{
                 real: card.real,
                 who: card.who,
@@ -92,6 +85,7 @@ export function ResultStep({ result, cardIds, player, sid, retain, onFinish }) {
       </div>
 
       <footer className="flex flex-col items-center gap-4 pt-1">
+        {won && <CertificateCard sid={sid} won={won} />}
         <p className="text-sm text-muted">
           Code <strong className="ml-1 rounded-lg bg-card px-2 py-1 font-mono text-sm text-ink ring-1 ring-line">{sid}</strong>
         </p>

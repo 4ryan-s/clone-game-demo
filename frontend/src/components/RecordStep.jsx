@@ -171,7 +171,7 @@ export function RecordStep({ sentence, maxSeconds, onSubmit }) {
         {review ? (
           <div className="rise flex flex-wrap justify-center gap-3">
             <Button primary disabled={busy} onClick={useThis}>{busy ? "Checking…" : "Use this"}</Button>
-            <Button disabled={busy} onClick={reset}>Record again</Button>
+            <Button disabled={busy} onClick={reset}>Re-record</Button>
           </div>
         ) : (
           <>

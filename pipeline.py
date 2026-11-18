@@ -13,7 +13,7 @@ import store
 from engines.base import EngineError
 
 log = logging.getLogger("pipeline")
-# The local GPU worker handles one clone at a time; two participants at once would queue here instead of timing out.
+# One Qwen clone at a time on the single GPU. The next participant waits here, outside the HTTP timeout.
 _locks = {"qwen3tts": threading.Lock()}
 
 
