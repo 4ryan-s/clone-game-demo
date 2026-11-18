@@ -21,20 +21,29 @@ import soundfile as sf  # noqa: E402
 import torch  # noqa: E402
 from qwen_tts import Qwen3TTSModel  # noqa: E402
 
+ATTN = "sdpa"
 if torch.cuda.is_available():
     major, _minor = torch.cuda.get_device_capability()
-    # bfloat16 kernels exist from Ampere (8.0) up. A T4 is Turing (7.5), so it uses float16.
-    DEVICE, DTYPE = "cuda:0", torch.bfloat16 if major >= 8 else torch.float16
+    if major >= 8:
+        # bfloat16 and the fast attention kernels exist from Ampere (8.0) up.
+        DEVICE, DTYPE, ATTN = "cuda:0", torch.bfloat16, "sdpa"
+    else:
+        # A T4 is Turing (7.5). Flash and memory-efficient attention abort there, and so can float16 sampling.
+        torch.backends.cuda.enable_flash_sdp(False)
+        torch.backends.cuda.enable_mem_efficient_sdp(False)
+        torch.backends.cuda.enable_math_sdp(True)
+        DEVICE, DTYPE, ATTN = "cuda:0", torch.float32, "eager"
 elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
     DEVICE, DTYPE = "mps", torch.float32     # float32: half precision on Apple GPUs can give garbled audio
 else:
     DEVICE, DTYPE = "cpu", torch.float32
-print(f"loading {config.QWEN_MODEL} on {DEVICE} ({DTYPE}) ...", flush=True)
+print(f"loading {config.QWEN_MODEL} on {DEVICE} ({DTYPE}, {ATTN}) ...", flush=True)
 t0 = time.time()
 try:
-    MODEL = Qwen3TTSModel.from_pretrained(config.QWEN_MODEL, device_map=DEVICE, dtype=DTYPE, attn_implementation="sdpa")
+    MODEL = Qwen3TTSModel.from_pretrained(config.QWEN_MODEL, device_map=DEVICE, dtype=DTYPE, attn_implementation=ATTN)
 except Exception as exc:  # noqa: BLE001
-    print("sdpa load failed, retrying with the default attention:", str(exc)[:150], flush=True)
+    print("attention load failed, retrying with the default attention:", str(exc)[:150], flush=True)
+    ATTN = "default"
     MODEL = Qwen3TTSModel.from_pretrained(config.QWEN_MODEL, device_map=DEVICE, dtype=DTYPE)
 print(f"ready in {time.time() - t0:.0f}s", flush=True)
 
@@ -55,7 +64,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        self._send(200, {"ready": True, "device": DEVICE, "dtype": str(DTYPE).removeprefix("torch.")}) if self.path == "/health" else self._send(404, {"error": "not found"})
+        self._send(200, {"ready": True, "device": DEVICE, "dtype": str(DTYPE).removeprefix("torch."), "attn": ATTN}) if self.path == "/health" else self._send(404, {"error": "not found"})
 
     def do_POST(self):
         if self.path != "/clone":
