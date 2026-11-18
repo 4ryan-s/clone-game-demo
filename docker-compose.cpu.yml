@@ -1,11 +1,9 @@
-# Use with the main file on a server that has no NVIDIA GPU.
+# Use with the main file on a Mac or any machine with no NVIDIA GPU.
 #   docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d --build
+# !reset drops the NVIDIA device reservation from docker-compose.yml. An empty list does not.
 services:
   qwen:
     build:
       args:
         TORCH_VARIANT: cpu
-    deploy:
-      resources:
-        reservations:
-          devices: []
+    deploy: !reset null

@@ -22,12 +22,14 @@ import torch  # noqa: E402
 from qwen_tts import Qwen3TTSModel  # noqa: E402
 
 if torch.cuda.is_available():
-    DEVICE, DTYPE = "cuda:0", torch.bfloat16
+    major, _minor = torch.cuda.get_device_capability()
+    # bfloat16 kernels exist from Ampere (8.0) up. A T4 is Turing (7.5), so it uses float16.
+    DEVICE, DTYPE = "cuda:0", torch.bfloat16 if major >= 8 else torch.float16
 elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
     DEVICE, DTYPE = "mps", torch.float32     # float32: half precision on Apple GPUs can give garbled audio
 else:
     DEVICE, DTYPE = "cpu", torch.float32
-print(f"loading {config.QWEN_MODEL} on {DEVICE} ...", flush=True)
+print(f"loading {config.QWEN_MODEL} on {DEVICE} ({DTYPE}) ...", flush=True)
 t0 = time.time()
 try:
     MODEL = Qwen3TTSModel.from_pretrained(config.QWEN_MODEL, device_map=DEVICE, dtype=DTYPE, attn_implementation="sdpa")
@@ -53,7 +55,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        self._send(200, {"ready": True, "device": DEVICE}) if self.path == "/health" else self._send(404, {"error": "not found"})
+        self._send(200, {"ready": True, "device": DEVICE, "dtype": str(DTYPE).removeprefix("torch.")}) if self.path == "/health" else self._send(404, {"error": "not found"})
 
     def do_POST(self):
         if self.path != "/clone":
@@ -75,4 +77,4 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
-HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+HTTPServer((os.environ.get("QWEN_HOST", "127.0.0.1"), PORT), Handler).serve_forever()
