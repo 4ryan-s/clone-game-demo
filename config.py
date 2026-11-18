@@ -62,8 +62,7 @@ MAX_ENGINES = 3
 # Settings for the second Sarvam clone ("sarvam2"). Form fields of POST /voices/clone, sent as text.
 SARVAM_VARIANT_PARAMS = {"remove_background_noise": "true", "enable_qc": "true", "pace": "0.95"}
 
-# Names shown on the reveal screen, after the participant has picked.
-ENGINE_LABELS = {"sarvam": "Sarvam", "sarvam2": "Sarvam (other settings)", "qwen3tts": "Qwen3-TTS"}
+# The reveal screen says only "Clone": which engine made a clip is kept in meta.json / set.json and never sent to the browser.
 
 # The clone check (see scoring.py). Margin below CUTOFF = called a clone.
 CUTOFF = 6.0

@@ -42,8 +42,8 @@ for i in range(12):
     res = requests.post(f"{base}/api/rounds/{rd['round_id']}/pick", json={"card": cards[0]}).json()
     if i == 0:
         check(sum(c["real"] for c in res["cards"]) == 1 and len(res["cards"]) == 4, "reveal: exactly one real card of four")
-        who = sorted(c["who"] for c in res["cards"] if not c["real"])
-        check(len(who) == 3, f"reveal names the clones: {who}")
+        check(sum(not c["real"] for c in res["cards"]) == 3, "reveal: three clones")
+        check(not any(w in str(res).lower() for w in ("sarvam", "qwen")), "the reveal does not name any cloning system")
         check(all("margin" in c and "says_clone" in c for c in res["cards"]), "every card has a clone-check score")
         again = requests.post(f"{base}/api/rounds/{rd['round_id']}/pick", json={"card": cards[1]}).json()
         check(again["picked"] == res["picked"], "the first pick stands")

@@ -79,7 +79,7 @@ def reveal(sid: str, meta: dict | None = None) -> dict:
     for c in meta["cards"]:
         x, sr = sf.read(str(_clip_path(sid, c)), dtype="float32")
         m = round(scoring.margin(x if x.ndim == 1 else x.mean(axis=1)), 1)
-        out.append({"card": c["id"], "real": c["kind"] == "real", "who": "You" if c["kind"] == "real" else config.ENGINE_LABELS.get(c["engine"], c["engine"]),
+        out.append({"card": c["id"], "real": c["kind"] == "real",
                     "margin": m, "says_clone": m < config.CUTOFF, "seconds": round(len(x) / sr, 1)})
     picked = next(r for r in out if r["card"] == meta["pick"])
     # Cache the scores with the session: they are what a training run would want next to the audio.

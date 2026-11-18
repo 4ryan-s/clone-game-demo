@@ -50,7 +50,7 @@ export function VoiceCard({ letter, playing, progress, onPlay, selected, onPick,
               "inline-flex max-w-full rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white",
               reveal.real ? "bg-good" : "bg-bad",
             )}>
-              {reveal.real ? realLabel : `Clone: ${reveal.who}`}
+              {reveal.real ? realLabel : "Clone"}
             </span>
             <p className="mt-1.5 min-h-4 text-xs text-muted">{reveal.picked ? "You picked this one" : "\u00a0"}</p>
             <div className="mt-1 flex flex-wrap items-end justify-between gap-1">

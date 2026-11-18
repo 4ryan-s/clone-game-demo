@@ -56,10 +56,10 @@ def start_round() -> dict:
         pool = [s for s in sets if s["id"] != _last_set] or sets
         chosen = random.SystemRandom().choice(pool)
         _last_set = chosen["id"]
-        cards = [{"id": secrets.token_urlsafe(6), "real": True, "who": chosen["name"], "file": chosen["dir"] / chosen["original"]["file"],
+        cards = [{"id": secrets.token_urlsafe(6), "real": True, "file": chosen["dir"] / chosen["original"]["file"],
                   "margin": chosen["original"]["margin"], "seconds": chosen["original"]["seconds"]}]
         for c in chosen["clones"]:
-            cards.append({"id": secrets.token_urlsafe(6), "real": False, "who": config.ENGINE_LABELS.get(c["engine"], c["engine"]),
+            cards.append({"id": secrets.token_urlsafe(6), "real": False,
                           "file": chosen["dir"] / c["file"], "margin": c["margin"], "seconds": c["seconds"]})
         random.SystemRandom().shuffle(cards)
         rid = secrets.token_urlsafe(9)
@@ -87,7 +87,7 @@ def pick(rid: str, card_id: str) -> dict | None:
         if r["pick"] is None:
             r["pick"] = card_id
         picked = r["pick"]
-    cards = [{"card": c["id"], "real": c["real"], "who": c["who"], "margin": round(c["margin"], 1),
+    cards = [{"card": c["id"], "real": c["real"], "margin": round(c["margin"], 1),
               "says_clone": c["margin"] < config.CUTOFF, "seconds": c["seconds"]} for c in r["cards"]]
     return {"won": next(c for c in cards if c["card"] == picked)["real"], "picked": picked, "cutoff": config.CUTOFF,
             "name": r["name"], "text": r["text"], "cards": cards}
