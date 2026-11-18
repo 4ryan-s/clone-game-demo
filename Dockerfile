@@ -14,8 +14,14 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends libsndfile1 libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
+# ONNX_GPU=1 installs the CUDA build so Spectra runs on the GPU. The voice-activity model stays on CPU.
+ARG ONNX_GPU=1
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && if [ "$ONNX_GPU" = "1" ]; then \
+         pip uninstall -y onnxruntime \
+         && pip install --no-cache-dir "onnxruntime-gpu[cuda,cudnn]==1.32.0"; \
+       fi
 COPY . .
 COPY --from=quiz /src/dist ./frontend/dist
 EXPOSE 8000

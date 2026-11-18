@@ -42,10 +42,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        ONNX_GPU: "1"
     environment:
       QWEN_URL: http://qwen:8766
       SARVAM_API_KEY: ${SARVAM_API_KEY:-}
       HF_HOME: /app/models/hf
+      SPECTRA_DEVICE: cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     ports:
       - "${DEMO_PORT:-8000}:8000"
     volumes:

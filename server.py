@@ -194,6 +194,8 @@ def health():
     for e in engines.enabled():
         ok, why = e.available()
         out[e.name] = {"ready": ok, "reason": why}
+    ok, why = scoring.ready()
+    out["spectra"] = {"ready": ok, "device": scoring.device(), "reason": why}
     return out
 
 

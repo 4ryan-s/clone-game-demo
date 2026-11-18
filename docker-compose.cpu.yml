@@ -7,3 +7,10 @@ services:
       args:
         TORCH_VARIANT: cpu
     deploy: !reset null
+  api:
+    build:
+      args:
+        ONNX_GPU: "0"
+    environment:
+      SPECTRA_DEVICE: cpu
+    deploy: !reset null
