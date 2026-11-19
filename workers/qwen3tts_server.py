@@ -31,6 +31,10 @@ from qwen_tts import Qwen3TTSModel  # noqa: E402
 
 ATTN = "sdpa"
 if torch.cuda.is_available():
+    # With several workers on one GPU, cap this process so they cannot starve each other (e.g. 0.4 = 40% of the card).
+    _frac = float(os.environ.get("QWEN_GPU_MEM_FRACTION", "0") or 0)
+    if 0 < _frac < 1:
+        torch.cuda.set_per_process_memory_fraction(_frac)
     major, _minor = torch.cuda.get_device_capability()
     if major >= 8:
         # bfloat16 and the fast attention kernels exist from Ampere (8.0) up.

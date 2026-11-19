@@ -7,6 +7,11 @@ services:
       args:
         TORCH_VARIANT: cpu
     deploy: !reset null
+  qwen2:
+    build:
+      args:
+        TORCH_VARIANT: cpu
+    deploy: !reset null
   api:
     build:
       args:
