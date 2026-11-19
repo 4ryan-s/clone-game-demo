@@ -113,8 +113,23 @@ Cards = 1 real + one per engine. Three engines (Sarvam, Sarvam with other settin
 - The browser only sees neutral slot ids (`c1`, `c2`). Which engine made which clip is in `meta.json` and is not sent before the pick.
 - Placeholders to settle: the final sentence (`config.SENTENCE`), the contact for deletion (`config.CONTACT`), and sign-off on `consent.py`.
 
+## Concurrency and batching
+
+Several people can generate clones at the same time. Sarvam is a cloud service and takes them in parallel. The local Qwen3-TTS worker runs **one model on one GPU** and serves them by **micro-batching** (`workers/batcher.py`):
+
+1. Every request waits in a queue.
+2. The first request opens a short window (`QWEN_BATCH_WINDOW_S`, default 2 s). Requests arriving inside the window join it, up to `QWEN_MAX_BATCH` (default 4).
+3. The whole batch goes through the model in one call. On a GPU, generating one clip leaves most of the card idle, so four clips in one batch take about as long as one. Each person gets back their own clip, made from their own voice.
+4. A request that arrives while a batch is running waits for it to finish and goes into the next batch.
+
+Measured on an RTX 4060 laptop (on battery, so slow): four different voices at once took 40 s for all four, the same as one clip; one at a time they would have taken about 140 s. Six at once ran as a batch of four and a batch of two (77 s). A batch of four used about 3.9 GB of video memory on top of the 2.7 GB model. `/health` always answers, also while generating (it reports the batching counters).
+
+Trade-offs: a lone person waits up to the window longer; a longer window catches people who finish a few seconds apart but delays everyone a little more. A batch is not extended once it has started (true continuous batching, for example with vLLM, would remove that wait). Raise `QWEN_MAX_BATCH` only if the GPU has the memory. The server no longer holds a per-engine lock, since that would stop people sharing a batch.
+
+Checks: `python tests/test_batcher.py` (no GPU, fake model) and `python tests/qwen_worker_live.py` (needs the running worker and a GPU).
+
 ## Known limits
 
-- One participant at a time on the GPU worker (a second queues).
+- Qwen3-TTS batches people who finish recording close together (see Concurrency). Someone who arrives just after a batch has started waits for it to finish, then runs in the next one, so their wait can be about twice as long.
 - Raw capture turns the browser's noise suppression, echo cancellation and auto gain off, so a noisy room is audible in the clip.
 - Not yet tried from a fresh machine: `setup.py` was checked with `--check` and `--dry-run` only.

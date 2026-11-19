@@ -13,8 +13,9 @@ import store
 from engines.base import EngineError
 
 log = logging.getLogger("pipeline")
-# The local GPU worker handles one clone at a time; two participants at once would queue here instead of timing out.
-_locks = {"qwen3tts": threading.Lock()}
+# No per-engine locks any more. The Qwen worker batches requests that arrive together (workers/batcher.py), so every
+# participant's request goes straight to it. (A lock here would stop two people ever sharing a batch.)
+_locks: dict[str, threading.Lock] = {}
 
 
 def start(sid: str) -> None:

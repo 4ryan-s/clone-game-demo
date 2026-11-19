@@ -1,22 +1,28 @@
 """Always-on Qwen3-TTS worker. Run with the qwen environment's Python (see start_demo.ps1).
 
-  GET  /health -> {"ready": true, "device": "cuda:0"}
-  POST /clone  {"ref", "ref_text", "text", "out"}  (absolute paths) -> {"ok": true, "seconds": ..., "sample_rate": ...}
-Listens on 127.0.0.1 only and handles one clone at a time. Loads the model once.
+  GET  /health -> {"ready": true, "device": "cuda:0", "batching": {...}}   (answers at any time, also while generating)
+  POST /clone  {"ref", "ref_text", "text", "out"}  (absolute paths) -> {"ok": true, "seconds": ..., "sample_rate": ..., "batch_size": n}
+
+Listens on 127.0.0.1 only and loads the model once. Requests are served by several threads, but the model is only ever
+called from the batching thread (workers/batcher.py): requests that arrive within QWEN_BATCH_WINDOW_S of each other are
+generated together as one batch of up to QWEN_MAX_BATCH, which takes about as long as a single clip.
 """
 import json
 import os
 import sys
 import threading
 import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import config  # noqa: E402
+from workers.batcher import Batcher  # noqa: E402
 
 os.environ.setdefault("HF_HOME", str(config.HF_HOME))
 PORT = int(os.environ.get("QWEN_PORT", config.QWEN_URL.rsplit(":", 1)[1]))
+MAX_BATCH = int(os.environ.get("QWEN_MAX_BATCH", "4"))
+BATCH_WINDOW_S = float(os.environ.get("QWEN_BATCH_WINDOW_S", "2.0"))
 
 import soundfile as sf  # noqa: E402
 import torch  # noqa: E402
@@ -69,6 +75,38 @@ def token_budget(text: str) -> int:
     return int(12 * seconds)
 
 
+def run_batch(jobs: list[dict]) -> list:
+    """Generate all jobs with one model call. Returns one result dict (or Exception) per job, in order. Runs on the batching thread only."""
+    n = len(jobs)
+    t0 = time.time()
+    budget = max(token_budget(j["text"]) for j in jobs)          # a clip that ends sooner simply stops earlier
+    if n == 1:
+        j = jobs[0]
+        wavs, sr = MODEL.generate_voice_clone(text=j["text"], language="English", ref_audio=j["ref"], ref_text=j["ref_text"], max_new_tokens=budget)
+    else:
+        wavs, sr = MODEL.generate_voice_clone(text=[j["text"] for j in jobs], language=["English"] * n, ref_audio=[j["ref"] for j in jobs],
+                                              ref_text=[j["ref_text"] for j in jobs], max_new_tokens=budget)
+    seconds = round(time.time() - t0, 2)
+    results = []
+    for j, w in zip(jobs, wavs):
+        try:
+            os.makedirs(os.path.dirname(j["out"]), exist_ok=True)
+            sf.write(j["out"], w, sr)
+            results.append({"ok": True, "seconds": seconds, "sample_rate": sr, "batch_size": n})
+        except Exception as exc:  # noqa: BLE001
+            results.append(exc)
+    print(f"batch of {n}: {seconds:.1f}s ({', '.join(f'{len(w) / sr:.1f}s' for w in wavs)} of audio)", flush=True)
+    return results
+
+
+BATCHER = Batcher(run_batch, max_batch=MAX_BATCH, window_s=BATCH_WINDOW_S)
+
+
+class Server(ThreadingHTTPServer):
+    daemon_threads = True
+    request_queue_size = 64
+
+
 class Handler(BaseHTTPRequestHandler):
     def _send(self, code, body):
         data = json.dumps(body).encode()
@@ -83,7 +121,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, {"error": "not found"})
         if MODEL is None:
             return self._send(503, {"ready": False, "error": LOAD_ERROR or "loading"})
-        self._send(200, {"ready": True, "device": DEVICE, "dtype": str(DTYPE).removeprefix("torch."), "attn": ATTN})
+        self._send(200, {"ready": True, "device": DEVICE, "dtype": str(DTYPE).removeprefix("torch."), "attn": ATTN, "batching": BATCHER.snapshot()})
 
     def do_POST(self):
         if self.path != "/clone":
@@ -92,13 +130,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(503, {"ok": False, "error": LOAD_ERROR or "still loading"})
         try:
             job = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
-            t = time.time()
-            wavs, sr = MODEL.generate_voice_clone(text=job["text"], language="English", ref_audio=job["ref"],
-                                                  ref_text=job["ref_text"], max_new_tokens=token_budget(job["text"]))
-            os.makedirs(os.path.dirname(job["out"]), exist_ok=True)
-            sf.write(job["out"], wavs[0], sr)
-            self._send(200, {"ok": True, "seconds": round(time.time() - t, 2), "sample_rate": sr})
-            print(f"clone done in {time.time() - t:.1f}s ({len(wavs[0]) / sr:.1f}s of audio)", flush=True)
+            result = BATCHER.submit({k: job[k] for k in ("ref", "ref_text", "text", "out")})
+            self._send(200, result)
         except Exception as exc:  # noqa: BLE001
             print("clone failed:", type(exc).__name__, str(exc)[:200], flush=True)
             self._send(500, {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:200]}"})
@@ -107,4 +140,4 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
-HTTPServer((os.environ.get("QWEN_HOST", "127.0.0.1"), PORT), Handler).serve_forever()
+Server((os.environ.get("QWEN_HOST", "127.0.0.1"), PORT), Handler).serve_forever()

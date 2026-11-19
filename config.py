@@ -73,7 +73,7 @@ PLAY_PAD_SECONDS = 0.2
 QWEN_URL = os.environ.get("QWEN_URL", "http://127.0.0.1:8766")
 QWEN_PYTHON = venv_python("qwen")
 QWEN_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"        # Hugging Face id, downloaded into MODELS_DIR/hf by setup.py
-QWEN_TIMEOUT_S = 120
+QWEN_TIMEOUT_S = 240       # one clip takes 15-50 s; a request that just missed a batch waits for that batch and then runs in the next one
 
 HF_HOME = MODELS_DIR / "hf"
 SARVAM_TIMEOUT_S = 90
