@@ -4,6 +4,9 @@ Consent -> recording -> clones made by every engine -> cards, pick and reveal wi
 Data: a session folder is working data and is deleted when the session ends. A recording is kept (numbered, with its
 session id) in data/voice_samples/ only if the participant ticked the optional box (see voicebank.py).
 """
+import asyncio
+import base64
+import json
 import logging
 import os
 import asyncio
