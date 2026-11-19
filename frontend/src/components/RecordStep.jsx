@@ -153,6 +153,7 @@ export function RecordStep({ sentence, maxSeconds, onSubmit }) {
       </blockquote>
 
       <div className="mt-7 w-full min-w-0">
+        <p className="mb-4 text-base font-medium text-ink sm:text-lg">Speak clearly, without any long pause, to enjoy this experience.</p>
         <div className="flex h-20 w-full items-center gap-1 sm:h-24 sm:gap-1.5" aria-hidden="true">
           {wave.map((value, index) => (
             <span
