@@ -36,7 +36,8 @@ def rows():
 a, b, c = wav("a.wav", 1.0, 0.1), wav("b.wav", 2.0, 0.2), wav("c.wav", 3.0, 0.3)
 
 check(not config.VOICE_SAMPLES_DIR.exists(), "nothing exists before the first consenting participant")
-check(voicebank.save("sessAAAAAA", a, "draft-2", 1.0) == 0, "first sample is number 0")
+check(voicebank.save("sessAAAAAA", a, "draft-2", 1.0, "show me my balance") == 0, "first sample is number 0")
+check(rows()[0]["transcript"] == "show me my balance", "the words said are stored with the sample")
 check(voicebank.save("sessBBBBBB", b, "draft-2", 2.0) == 1, "second sample is number 1")
 check((config.VOICE_SAMPLES_DIR / "000000.wav").is_file() and (config.VOICE_SAMPLES_DIR / "000001.wav").is_file(), "files are 000000.wav and 000001.wav")
 check([r["session_id"] for r in rows()] == ["sessAAAAAA", "sessBBBBBB"], "index holds the session ids in order")

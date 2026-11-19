@@ -4,6 +4,7 @@ Consent -> recording -> clones made by every engine -> cards, pick and reveal wi
 Data: a session folder is working data and is deleted when the session ends. A recording is kept (numbered, with its
 session id) in data/voice_samples/ only if the participant ticked the optional box (see voicebank.py).
 """
+import asyncio
 import logging
 import os
 import shutil
@@ -21,6 +22,7 @@ import engines
 import game
 import pipeline
 import scoring
+import speech_check
 import store
 import voicebank
 from consent import CONSENT
@@ -88,16 +90,24 @@ async def upload_recording(sid: str, file: UploadFile = File(...)):
         raise HTTPException(400, str(exc))
     x = audio.to_16k(x, sr)
     verdict = audio.check_recording(x)
+    review = None
+    if verdict["ok"]:
+        # Words, hesitation sounds and long pauses. Runs in a thread: it calls Sarvam and the speech detector, which must not block the server.
+        review = await asyncio.to_thread(speech_check.review, x)
+        verdict["issues"] += review["issues"]
+        verdict["ok"] = not verdict["issues"]
+        verdict["transcript"] = review["transcript"]
     if verdict["ok"]:
         d = store.path(sid)
         audio.write_wav(d / "original.wav", x)
-        store.write(sid, "recording.json", {**verdict, "browser_sample_rate": sr, "at": time.time()})
+        store.write(sid, "recording.json", {**verdict, "browser_sample_rate": sr, "at": time.time(), "longest_pause": review["longest_pause"],
+                                            "fillers": review["fillers"], "stt_error": review["stt_error"]})
         consent = store.read(sid, "consent.json", {})
         if consent.get("retain"):
             # Agreed to keep it: copy into the numbered voice bank now, so it is not lost if they close the tab before Finish.
             # A re-record replaces the earlier take under the same number. No agreement: nothing is copied anywhere.
             try:
-                voicebank.save(sid, d / "original.wav", consent.get("version", ""), verdict["seconds"])
+                voicebank.save(sid, d / "original.wav", consent.get("version", ""), verdict["seconds"], verdict.get("transcript") or "")
             except OSError as exc:
                 log.error("could not save the voice sample for %s: %s", sid, exc)
                 raise HTTPException(500, "Your recording could not be saved. Please try again.")

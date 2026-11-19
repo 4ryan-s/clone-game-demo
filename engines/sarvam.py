@@ -5,6 +5,7 @@ never written to disk, and scrubbed from any error text.
 """
 import base64
 import os
+import time
 from pathlib import Path
 
 import requests
@@ -36,15 +37,25 @@ class Sarvam(Engine):
         key = _key()
         if not key:
             raise EngineError("SARVAM_API_KEY is not set")
-        try:
-            with open(ref_wav, "rb") as fh:
-                r = requests.post(
-                    "https://api.sarvam.ai/voices/clone", headers={"api-subscription-key": key},
-                    files={"ref_audio": ("ref.wav", fh, "audio/wav")},
-                    data={"text": text, "language_code": "en-IN", "ref_text": ref_text, **self.params},
-                    timeout=config.SARVAM_TIMEOUT_S)
-        except requests.RequestException as exc:
-            raise EngineError(f"Sarvam request failed ({type(exc).__name__})") from None
+        r = None
+        for attempt in range(3):                       # Sarvam answers 429 (rate limit) when many people clone at once: wait a little and retry
+            try:
+                with open(ref_wav, "rb") as fh:
+                    r = requests.post(
+                        "https://api.sarvam.ai/voices/clone", headers={"api-subscription-key": key},
+                        files={"ref_audio": ("ref.wav", fh, "audio/wav")},
+                        data={"text": text, "language_code": "en-IN", "ref_text": ref_text, **self.params},
+                        timeout=config.SARVAM_TIMEOUT_S)
+            except requests.RequestException as exc:
+                if attempt == 2:
+                    raise EngineError(f"Sarvam request failed ({type(exc).__name__})") from None
+                time.sleep(2 * (attempt + 1))
+                continue
+            if r.status_code == 429 or r.status_code >= 500:
+                if attempt < 2:
+                    time.sleep(2 * (attempt + 1))
+                    continue
+            break
         if r.status_code != 200:
             raise EngineError(f"Sarvam HTTP {r.status_code}: {r.text[:200].replace(key, '<key>')}")
         out_wav.parent.mkdir(parents=True, exist_ok=True)

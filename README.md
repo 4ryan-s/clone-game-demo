@@ -113,6 +113,16 @@ Cards = 1 real + one per engine. Three engines (Sarvam, Sarvam with other settin
 - The browser only sees neutral slot ids (`c1`, `c2`). Which engine made which clip is in `meta.json` and is not sent before the pick.
 - Placeholders to settle: the final sentence (`config.SENTENCE`), the contact for deletion (`config.CONTACT`), and sign-off on `consent.py`.
 
+## Speech to text on the recording
+
+When the recording passes the audio quality check it is sent to Sarvam speech to text (`stt.py`, model `saaras:v4`, `verbatim` mode, about 1 s). The words it hears are used three ways:
+
+1. **What the clones say.** Every clone speaks what the person actually said, not the sentence on screen (the sentence is now only a suggestion, and the fallback if speech to text is off). Measured with Whisper on one test: the clones' word error against the person's words was 0.06 to 0.16, against the on-screen sentence 1.4 to 1.7.
+2. **A better clone.** Qwen3-TTS needs the exact transcript of the reference audio. In a test with a wrong transcript it produced unintelligible speech (word error 1.00, running to the length cap); with the right one it was clean (0.0 to 0.2). So a person who misreads or ad-libs no longer breaks the Qwen clone. Speaker similarity did not change in that test (0.76 against 0.76, and 0.83 against 0.87), so the gain is intelligibility, not likeness.
+3. **Retry advice** (`speech_check.py`). The recording is sent back with a plain sentence if there are no words, if the words contain a filler sound ("um", "uh", "hmm"; `verbatim` mode keeps them), or if there is a silence longer than `config.MAX_PAUSE_SECONDS` (1.5 s) in the middle of the speech. Pauses are found with the Silero speech detector, because Sarvam's timestamps are one chunk for the whole clip and cannot show a pause. Silence before and after the speech is ignored.
+
+If speech to text fails (for example Sarvam answers 429, its rate limit) the person is asked to try again (`config.STT_REQUIRED`). Setting it to `False` carries on with the on-screen sentence, but then Qwen can get a transcript that does not match the audio. The words are also stored in the voice bank index (`transcript` column) for people who agreed to keep their recording. Filler detection is checked on text-to-speech audio saying "um" and "uh", not yet on real hesitations. `STT_*`, `MIN_WORDS` and `MAX_PAUSE_SECONDS` are in `config.py`. Checks: `python tests/test_speech_check.py <speech.wav>`.
+
 ## Concurrency and batching
 
 Several people can generate clones at the same time. Sarvam is a cloud service and takes them in parallel. The local Qwen3-TTS worker runs **one model on one GPU** and serves them by **micro-batching** (`workers/batcher.py`):

@@ -13,7 +13,7 @@ CONSENT = {
     "points": [
         "Your voice is personal data. We record you reading one short sentence.",
         "Two voice-cloning systems make three copies of your voice. One, Qwen3-TTS, runs on this computer. The other, Sarvam, is an outside company: "
-        "your recording and the sentence are sent to Sarvam over the internet to create its two copies.",
+        "your recording is sent to Sarvam over the internet, to turn what you say into text and to create its two copies. The copies say the words you spoke.",
         "Nothing else about you is collected. We do not ask for your name. You get a session code.",
         "You can stop at any point. The copies are always deleted when you finish. If you do not tick the second box below, "
         "your own recording is deleted too. If you do tick it, only your own recording is kept.",
@@ -26,7 +26,7 @@ CONSENT = {
     },
     "optional": {
         "id": "retain",
-        "label": "Optional: you may keep my own recording, and use it to train and test our voice-fraud detection. "
-                 "It will be stored without my name, filed under a number and my session code, and will not be shared outside the company.",
+        "label": "Optional: you may keep my own recording and a text version of what I said, and use them to train and test our voice-fraud detection. "
+                 "They will be stored without my name, filed under a number and my session code, and will not be shared outside the company.",
     },
 }

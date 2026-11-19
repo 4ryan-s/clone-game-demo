@@ -52,7 +52,10 @@ def _one(sid: str, eng, slot: str, text: str) -> None:
 
 
 def _run(sid: str, ens, slots) -> None:
-    text = config.SENTENCE
+    # Whatever the participant said (from speech to text) is what every clone says, and it is also the transcript of the
+    # reference audio. Qwen3-TTS needs that transcript to match the audio exactly: with the wrong one it produced
+    # unintelligible speech in our test. If speech to text was unavailable, fall back to the sentence shown on screen.
+    text = (store.read(sid, "recording.json", {}).get("transcript") or "").strip() or config.SENTENCE
     with ThreadPoolExecutor(max_workers=len(ens)) as pool:
         list(pool.map(lambda e: _one(sid, e, slots[e.name], text), ens))
 

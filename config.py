@@ -50,6 +50,17 @@ MAX_SECONDS = 14.0
 MIN_RMS_DBFS = -45.0       # quieter than this is rejected as "too quiet"
 MAX_CLIPPED_FRACTION = 0.01
 
+# Speech to text (Sarvam) on the recording: the words said become the text every clone speaks and the exact transcript of the reference.
+# SENTENCE above is then only the suggestion shown on screen, and the fallback if speech to text is down.
+STT_ENABLED = True
+STT_REQUIRED = True            # if speech to text fails, ask the person to try again. False: carry on with SENTENCE (Qwen then gets a transcript that may not match the audio and can produce unintelligible speech)
+STT_MODEL = "saaras:v4"
+STT_MODE = "verbatim"          # keeps "um" and "uh" as spoken, so the transcript matches the audio and the fillers can be flagged
+STT_LANGUAGE = "en-IN"
+STT_TIMEOUT_S = 30
+MIN_WORDS = 2                  # fewer words than this and the recording is sent back
+MAX_PAUSE_SECONDS = 1.5        # a silence this long in the middle of the speech sends the recording back
+
 # Cloning engines, in slot order. A new engine is one file in engines/ plus its name here.
 # Cards shown to the user = 1 real + one per engine, so three engines give four cards.
 ENGINES = ["sarvam", "sarvam2", "qwen3tts"]
@@ -81,7 +92,7 @@ SARVAM_TIMEOUT_S = 90
 # Shown on the consent page as the person to contact to delete a recording. Leave empty to say "ask the demo host".
 CONTACT = ""
 
-CONSENT_VERSION = "draft-2"   # bump whenever the consent wording changes; stored with every session
+CONSENT_VERSION = "draft-3"   # bump whenever the consent wording changes; stored with every session
 
 try:                           # machine-specific overrides (paths to models and environments that already exist here)
     from local_config import *  # noqa: F401,F403

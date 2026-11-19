@@ -62,6 +62,17 @@ def window_around_speech(wav: np.ndarray, target_len: int = PAD_INPUT_SAMPLES) -
     return wav[start:end]
 
 
+def speech_probs(wav: np.ndarray) -> np.ndarray:
+    """Silero speech probability for every 512-sample (32 ms) frame of a 16 kHz clip. Used to find pauses (speech_check.py)."""
+    global _vad
+    n_frames = len(wav) // _FRAME
+    with _vad_lock:
+        if _vad is None:
+            _vad = _Silero(config.ROOT / "assets" / "silero_vad.onnx")
+        _vad.reset()
+        return np.array([_vad(wav[i * _FRAME:(i + 1) * _FRAME]) for i in range(n_frames)])
+
+
 def preemphasis(audio: np.ndarray, alpha: float = PREEMPHASIS_ALPHA) -> np.ndarray:
     out = np.empty_like(audio)
     out[0] = audio[0]

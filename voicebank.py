@@ -23,7 +23,7 @@ from pathlib import Path
 
 import config
 
-FIELDS = ["index", "session_id", "status", "saved_at", "updated_at", "consent_version", "seconds", "sha256", "deleted_at"]
+FIELDS = ["index", "session_id", "status", "saved_at", "updated_at", "consent_version", "seconds", "sha256", "deleted_at", "transcript"]
 _lock = threading.RLock()   # one server process; the index is small and rewritten whole under this lock
 
 
@@ -76,7 +76,7 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def save(session_id: str, wav_path: Path, consent_version: str, seconds: float) -> int:
+def save(session_id: str, wav_path: Path, consent_version: str, seconds: float, transcript: str = "") -> int:
     """Copy the recording into the numbered folder and return its number.
     Called only when the participant agreed to keep their recording. A second call for the same session (they recorded
     again) replaces the file under the same number."""
@@ -89,7 +89,8 @@ def save(session_id: str, wav_path: Path, consent_version: str, seconds: float) 
         tmp = dest.with_suffix(".wav.tmp")
         shutil.copyfile(wav_path, tmp)
         os.replace(tmp, dest)
-        fields = {"seconds": f"{seconds:.2f}", "sha256": _sha256(dest), "updated_at": _now(), "consent_version": consent_version}
+        fields = {"seconds": f"{seconds:.2f}", "sha256": _sha256(dest), "updated_at": _now(), "consent_version": consent_version,
+                  "transcript": transcript}
         if row:
             row.update(fields)
         else:
