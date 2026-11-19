@@ -15,13 +15,14 @@ log = logging.getLogger("pipeline")
 # Engines that must not run at the same time hold a shared lock, keyed by eng.lock_key:
 #   - Qwen is NOT locked (serialize = False): its workers batch simultaneous requests and the engine spreads them over the workers.
 #   - "sarvam":   both Sarvam clones share one remote rate limit, so they go one after another, not together.
-_locks: dict[str, threading.Lock] = {}
+_locks: dict[str, threading.Semaphore] = {}
 _locks_guard = threading.Lock()
 
 
-def _lock_for(eng) -> threading.Lock:
+def _lock_for(eng) -> threading.Semaphore:
+    """A semaphore per lock group: max_concurrent = 1 behaves like a lock; Sarvam allows a few at once."""
     with _locks_guard:
-        return _locks.setdefault(eng.lock_key, threading.Lock())
+        return _locks.setdefault(eng.lock_key, threading.Semaphore(max(1, eng.max_concurrent)))
 
 
 def start(sid: str) -> None:

@@ -34,6 +34,15 @@ from consent import CONSENT
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("server")
+
+
+class _QuietPolling(logging.Filter):
+    """Every browser asks /status twice a second while clones are made; keep those out of the access log."""
+    def filter(self, record):
+        return "/status" not in record.getMessage()
+
+
+logging.getLogger("uvicorn.access").addFilter(_QuietPolling())
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 DEBUG = os.environ.get("DEMO_DEBUG") == "1"
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")

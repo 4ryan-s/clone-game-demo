@@ -99,8 +99,7 @@ def token_budget(text: str) -> int:
 TOKENS_PER_SECOND = 12.5      # the 12 Hz speech codec: the clip length at the token cap is max_new_tokens / 12.5
 
 
-def generate(jobs: list[dict], budget: int):
-    """One model call for these jobs. Returns (list of float32 numpy clips, sample rate)."""
+def _generate(jobs: list[dict], budget: int):
     n = len(jobs)
     if n == 1:
         j = jobs[0]
@@ -109,6 +108,22 @@ def generate(jobs: list[dict], budget: int):
         wavs, sr = MODEL.generate_voice_clone(text=[j["text"] for j in jobs], language=["English"] * n, ref_audio=[j["ref"] for j in jobs],
                                               ref_text=[j["ref_text"] for j in jobs], max_new_tokens=budget)
     return list(wavs), sr
+
+
+def generate(jobs: list[dict], budget: int):
+    """One model call for these jobs. Returns (list of float32 numpy clips, sample rate).
+    If the GPU runs out of memory the cache is freed and the batch is split in two (down to single clips), so users still get a clip."""
+    try:
+        return _generate(jobs, budget)
+    except torch.cuda.OutOfMemoryError:
+        torch.cuda.empty_cache()
+        if len(jobs) == 1:
+            raise
+        log.warning("out of GPU memory with a batch of %d: splitting it in two (%s)", len(jobs), gpu_mem())
+        half = len(jobs) // 2
+        a, sr = generate(jobs[:half], budget)
+        b, _ = generate(jobs[half:], budget)
+        return a + b, sr
 
 
 def run_batch(jobs: list[dict]) -> list:
@@ -133,6 +148,8 @@ def run_batch(jobs: list[dict]) -> list:
             if not second[1]["ran_on"] or second[1]["speech_end"] < trimmed[i][1]["speech_end"]:
                 trimmed[i] = second                                 # the new take ended properly (or at least earlier)
     seconds = round(time.time() - t0, 2)
+    if DEVICE == "cuda:0":
+        torch.cuda.empty_cache()          # give cached blocks back so the other GPU user (the clone check in the api) is not starved
     results = []
     for i, (j, (clip, info)) in enumerate(zip(jobs, trimmed)):
         try:

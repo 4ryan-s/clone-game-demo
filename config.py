@@ -102,6 +102,7 @@ QWEN_TIMEOUT_S = 240       # one clip takes 15-50 s; a request that just missed 
 
 HF_HOME = MODELS_DIR / "hf"
 SARVAM_TIMEOUT_S = 90
+SARVAM_CONCURRENCY = int(os.environ.get("SARVAM_CONCURRENCY", "3"))   # Sarvam clones allowed at the same time across ALL sessions (1 = one after another). Lower it if you see HTTP 429
 SARVAM_MAX_RETRIES = 1        # on HTTP 429 (rate limit): retry a clone at most once, so a throttle does not trigger a burst of extra calls
 SARVAM_RETRY_BASE_S = 4.0     # wait before the single retry (unless the server sends a longer Retry-After header)
 

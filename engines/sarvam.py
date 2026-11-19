@@ -60,7 +60,8 @@ def _key() -> str | None:
 
 class Sarvam(Engine):
     name = "sarvam"
-    lock_group = "sarvam"      # both Sarvam clones share one remote rate limit, so they must not fire at the same time
+    lock_group = "sarvam"      # both Sarvam clones share one remote rate limit, so at most SARVAM_CONCURRENCY of them run at once
+    max_concurrent = config.SARVAM_CONCURRENCY
     params: dict = {}          # extra form fields for /voices/clone; the variant below overrides these
 
     def available(self):

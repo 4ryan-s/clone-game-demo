@@ -7,5 +7,5 @@ echo "2/4 undefined names";   (python3 -m ruff --version >/dev/null 2>&1 && pyth
                               || (command -v ruff >/dev/null && ruff check --select F --quiet .) \
                               || python3 -m pyflakes . || echo "   (install ruff or pyflakes to enable this check)"
 echo "3/4 compose files";     docker compose config -q && docker compose -f docker-compose.yml -f docker-compose.cpu.yml config -q
-echo "4/4 tests";             python3 -m pytest -q tests/test_qwen_routing.py tests/test_batcher.py
+echo "4/4 tests";             python3 -m pytest -q tests/test_qwen_routing.py tests/test_pipeline_limits.py tests/test_batcher.py
 echo "preflight OK"

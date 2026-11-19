@@ -11,6 +11,7 @@
 
 services:
   qwen: &qwen
+    hostname: qwen                # shows up as the worker name in the logs
     build:
       context: .
       dockerfile: Dockerfile.qwen
@@ -20,11 +21,11 @@ services:
       QWEN_HOST: 0.0.0.0
       QWEN_PORT: "8766"
       HF_HOME: /app/models/hf
-      # Two workers share the one GPU, each with its own copy of the weights. Measure with tests/qwen_bench.py before changing.
-      QWEN_MAX_BATCH: ${QWEN_MAX_BATCH:-3}
-      QWEN_BATCH_WINDOW_S: ${QWEN_BATCH_WINDOW_S:-1.5}
+      # Default is ONE worker (the qwen2 service is off unless COMPOSE_PROFILES=two-workers). See .env.example for both presets.
+      QWEN_MAX_BATCH: ${QWEN_MAX_BATCH:-4}
+      QWEN_BATCH_WINDOW_S: ${QWEN_BATCH_WINDOW_S:-1.0}
       PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
-      QWEN_GPU_MEM_FRACTION: ${QWEN_GPU_MEM_FRACTION:-0.35}
+      QWEN_GPU_MEM_FRACTION: ${QWEN_GPU_MEM_FRACTION:-0.6}
     volumes:
       - ./models:/app/models
       - ./data:/app/data
@@ -43,9 +44,11 @@ services:
       retries: 40
       start_period: 180s
 
-  # Second worker: same image and settings, its own model copy. To go back to one, delete this and the qwen2 lines below.
+  # Second worker (optional): same image and settings, its own model copy. Only started with COMPOSE_PROFILES=two-workers.
   qwen2:
     <<: *qwen
+    hostname: qwen2
+    profiles: ["two-workers"]
 
   api:
     build:
@@ -54,7 +57,7 @@ services:
       args:
         ONNX_GPU: "1"
     environment:
-      QWEN_URLS: http://qwen:8766,http://qwen2:8766
+      QWEN_URLS: ${QWEN_URLS:-http://qwen:8766}
       SARVAM_API_KEY: ${SARVAM_API_KEY:-}
       HF_HOME: /app/models/hf
       SPECTRA_DEVICE: cuda
@@ -75,6 +78,7 @@ services:
         condition: service_healthy
       qwen2:
         condition: service_healthy
+        required: false           # not started in the default one-worker setup
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
