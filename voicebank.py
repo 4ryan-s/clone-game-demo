@@ -119,6 +119,12 @@ def find(session_id: str) -> list[dict]:
         return [r for r in _read() if r["session_id"] == session_id]
 
 
+def count_saved() -> int:
+    """How many recordings are currently kept in the voice bank (not counting deleted ones)."""
+    with _lock:
+        return sum(r["status"] == "saved" for r in _read())
+
+
 def _main(argv: list[str]) -> int:
     if argv[:1] == ["list"]:
         rows = _read()

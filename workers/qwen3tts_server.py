@@ -11,6 +11,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from socketserver import ThreadingMixIn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import config  # noqa: E402
@@ -40,6 +41,8 @@ else:
     DEVICE, DTYPE = "cpu", torch.float32
 MODEL = None
 LOAD_ERROR = None
+# One generate at a time. A second visitor waits; their health check must still get an answer.
+_CLONE_LOCK = threading.Lock()
 
 
 def load_model():
@@ -92,19 +95,27 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(503, {"ok": False, "error": LOAD_ERROR or "still loading"})
         try:
             job = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
-            t = time.time()
-            wavs, sr = MODEL.generate_voice_clone(text=job["text"], language="English", ref_audio=job["ref"],
-                                                  ref_text=job["ref_text"], max_new_tokens=token_budget(job["text"]))
-            os.makedirs(os.path.dirname(job["out"]), exist_ok=True)
-            sf.write(job["out"], wavs[0], sr)
-            self._send(200, {"ok": True, "seconds": round(time.time() - t, 2), "sample_rate": sr})
-            print(f"clone done in {time.time() - t:.1f}s ({len(wavs[0]) / sr:.1f}s of audio)", flush=True)
         except Exception as exc:  # noqa: BLE001
-            print("clone failed:", type(exc).__name__, str(exc)[:200], flush=True)
-            self._send(500, {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:200]}"})
+            return self._send(400, {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:200]}"})
+        with _CLONE_LOCK:
+            try:
+                t = time.time()
+                wavs, sr = MODEL.generate_voice_clone(text=job["text"], language="English", ref_audio=job["ref"],
+                                                      ref_text=job["ref_text"], max_new_tokens=token_budget(job["text"]))
+                os.makedirs(os.path.dirname(job["out"]), exist_ok=True)
+                sf.write(job["out"], wavs[0], sr)
+                self._send(200, {"ok": True, "seconds": round(time.time() - t, 2), "sample_rate": sr})
+                print(f"clone done in {time.time() - t:.1f}s ({len(wavs[0]) / sr:.1f}s of audio)", flush=True)
+            except Exception as exc:  # noqa: BLE001
+                print("clone failed:", type(exc).__name__, str(exc)[:200], flush=True)
+                self._send(500, {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:200]}"})
 
     def log_message(self, *args):
         pass
 
 
-HTTPServer((os.environ.get("QWEN_HOST", "127.0.0.1"), PORT), Handler).serve_forever()
+class Server(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
+
+
+Server((os.environ.get("QWEN_HOST", "127.0.0.1"), PORT), Handler).serve_forever()

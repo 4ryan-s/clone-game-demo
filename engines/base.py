@@ -8,6 +8,12 @@ class EngineError(RuntimeError):
 
 class Engine:
     name = "base"
+    lock_group: str | None = None   # engines sharing a group run one at a time (e.g. both Sarvam clones share one remote rate limit)
+
+    @property
+    def lock_key(self) -> str:
+        """The name used to serialize this engine against others. Defaults to its own name (no sharing)."""
+        return self.lock_group or self.name
 
     def available(self) -> tuple[bool, str]:
         """(ready, reason if not). Called before a run so a missing key or stopped worker is visible early."""

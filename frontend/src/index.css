@@ -169,6 +169,44 @@ body {
 .meter-bar { transition: width 80ms linear; }
 .gauge-dot { transition: left 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
 
+/* Draggable audio scrubber: transparent native track, custom visible thumb. */
+.scrub {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 24px;
+  background: transparent;
+  cursor: pointer;
+  touch-action: none;
+}
+.scrub::-webkit-slider-runnable-track { height: 24px; background: transparent; }
+.scrub::-moz-range-track { height: 24px; background: transparent; }
+.scrub::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 16px;
+  width: 16px;
+  margin-top: 4px;
+  border-radius: 9999px;
+  background: var(--color-accent);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 5px rgba(28, 25, 21, 0.35);
+}
+.scrub::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  border-radius: 9999px;
+  background: var(--color-accent);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 5px rgba(28, 25, 21, 0.35);
+}
+.scrub:focus-visible { outline: none; }
+.scrub:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(15, 111, 91, 0.25); }
+.scrub:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(15, 111, 91, 0.25); }
+.scrub:disabled { cursor: default; }
+.scrub:disabled::-webkit-slider-thumb { background: var(--color-line); border-color: #fff; }
+.scrub:disabled::-moz-range-thumb { background: var(--color-line); border-color: #fff; }
+
 @media (prefers-reduced-motion: reduce) {
   .rise, .pop, .spin, .eq, .pulse-ring, .scan, .confetti-bit, .confetti-screen .confetti-bit, .shine, .draw, .blink {
     animation: none !important;
