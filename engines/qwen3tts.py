@@ -1,5 +1,7 @@
 """Qwen3-TTS (0.6B, open weights) on this machine, through the always-on worker in workers/qwen3tts_server.py."""
+import logging
 import threading
+import time
 from pathlib import Path
 
 import requests
@@ -8,6 +10,7 @@ import config
 from .base import Engine, EngineError
 
 
+log = logging.getLogger("qwen.client")
 _LOCK = threading.Lock()
 _IN_FLIGHT = {url: 0 for url in config.QWEN_URLS}
 
@@ -20,6 +23,7 @@ def _by_load():
 
 class Qwen3TTS(Engine):
     name = "qwen3tts"
+    serialize = False        # the workers batch simultaneous requests; locking here would force them to run one at a time
 
     def available(self):
         loading = False
@@ -37,22 +41,32 @@ class Qwen3TTS(Engine):
         out_wav.parent.mkdir(parents=True, exist_ok=True)
         payload = {"ref": ref_wav.resolve().as_posix(), "ref_text": ref_text, "text": text, "out": out_wav.resolve().as_posix()}
         last = "no worker configured"
+        t0 = time.time()
         for url in _by_load():                  # a worker that is down or still loading is skipped; the next one takes the job
             with _LOCK:
                 _IN_FLIGHT[url] += 1
+                load = dict(_IN_FLIGHT)
+            log.info("sending to %s (requests in flight per worker, including this one: %s)", url, load)
             try:
                 r = requests.post(url + "/clone", timeout=config.QWEN_TIMEOUT_S, json=payload)
             except requests.RequestException as exc:
                 last = f"Qwen3-TTS worker unreachable ({type(exc).__name__})"
+                log.warning("%s unreachable (%s): trying the next worker", url, type(exc).__name__)
                 continue
             finally:
                 with _LOCK:
                     _IN_FLIGHT[url] -= 1
             if r.status_code == 503:
                 last = f"Qwen3-TTS worker not ready: {r.text[:100]}"
+                log.warning("%s not ready: trying the next worker", url)
                 continue
             if r.status_code != 200 or not r.json().get("ok"):
+                log.error("%s failed after %.1fs: HTTP %s %s", url, time.time() - t0, r.status_code, r.text[:200])
                 raise EngineError(f"Qwen3-TTS failed: {r.text[:200]}")
+            body = r.json()
+            log.info("done by %s [%s] in %.1fs total: batch #%s of %s clip(s), waited %ss for the batch, generation %ss%s",
+                     url, body.get("worker"), time.time() - t0, body.get("batch_id"), body.get("batch_size"), body.get("queue_wait_s"),
+                     body.get("seconds"), ", retried (clip ran on)" if body.get("retried") else "")
             break
         else:
             raise EngineError(last)

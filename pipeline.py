@@ -13,7 +13,7 @@ from engines.base import EngineError
 
 log = logging.getLogger("pipeline")
 # Engines that must not run at the same time hold a shared lock, keyed by eng.lock_key:
-#   - "qwen3tts": one Qwen clone at a time on the single GPU (the next participant waits here, outside the HTTP timeout).
+#   - Qwen is NOT locked (serialize = False): its workers batch simultaneous requests and the engine spreads them over the workers.
 #   - "sarvam":   both Sarvam clones share one remote rate limit, so they go one after another, not together.
 _locks: dict[str, threading.Lock] = {}
 _locks_guard = threading.Lock()
@@ -45,11 +45,15 @@ def _one(sid: str, eng, slot: str, text: str) -> None:
         if not ok:
             raise EngineError(why)
         raw = d / "raw" / f"{eng.name}.wav"
-        with _lock_for(eng):
+        if eng.serialize:
+            with _lock_for(eng):
+                info = eng.clone(d / "original.wav", text, text, raw)
+        else:
             info = eng.clone(d / "original.wav", text, text, raw)
         x, sr = audio.read_wav_bytes(raw.read_bytes())
         (d / "clones").mkdir(exist_ok=True)
         audio.write_wav(d / "clones" / f"{slot}.wav", audio.to_16k(x, sr))
+        log.info("session %s engine %s done in %.1fs", sid, eng.name, time.time() - t0)
         result = {"status": "done", "seconds": round(time.time() - t0, 2), "error": None, "source_sample_rate": sr, **(info or {})}
     except Exception as exc:  # noqa: BLE001
         log.warning("engine %s failed for %s: %s", eng.name, sid, exc)

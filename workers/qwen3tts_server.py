@@ -8,7 +8,9 @@ called from the batching thread (workers/batcher.py): requests that arrive withi
 generated together as one batch of up to QWEN_MAX_BATCH, which takes about as long as a single clip.
 """
 import json
+import logging
 import os
+import socket
 import sys
 import threading
 import time
@@ -19,6 +21,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import config  # noqa: E402
 import tailtrim  # noqa: E402
 from workers.batcher import Batcher  # noqa: E402
+
+WORKER = os.environ.get("QWEN_WORKER_NAME") or socket.gethostname()
+logging.basicConfig(level=logging.INFO, format=f"%(asctime)s %(levelname)s [{WORKER}] %(name)s: %(message)s")
+log = logging.getLogger("qwen")
 
 os.environ.setdefault("HF_HOME", str(config.HF_HOME))
 PORT = int(os.environ.get("QWEN_PORT", config.QWEN_URL.rsplit(":", 1)[1]))
@@ -55,22 +61,30 @@ LOAD_ERROR = None
 _CLONE_LOCK = threading.Lock()
 
 
+def gpu_mem() -> str:
+    if DEVICE != "cuda:0":
+        return "no GPU"
+    mib = 1024 * 1024
+    return "GPU memory: %d MiB in use by tensors, %d MiB reserved, peak %d MiB" % (
+        torch.cuda.memory_allocated() // mib, torch.cuda.memory_reserved() // mib, torch.cuda.max_memory_allocated() // mib)
+
+
 def load_model():
     """Load after the port is open. A health check during the load then gets a reply instead of connection refused."""
     global MODEL, ATTN, LOAD_ERROR
-    print(f"loading {config.QWEN_MODEL} on {DEVICE} ({DTYPE}, {ATTN}) ...", flush=True)
+    log.info("loading %s on %s (%s, %s), max batch %d, window %.1fs", config.QWEN_MODEL, DEVICE, DTYPE, ATTN, MAX_BATCH, BATCH_WINDOW_S)
     t0 = time.time()
     try:
         try:
             MODEL = Qwen3TTSModel.from_pretrained(config.QWEN_MODEL, device_map=DEVICE, dtype=DTYPE, attn_implementation=ATTN)
         except Exception as exc:  # noqa: BLE001
-            print("attention load failed, retrying with the default attention:", str(exc)[:150], flush=True)
+            log.warning("attention load failed, retrying with the default attention: %s", str(exc)[:150])
             ATTN = "default"
             MODEL = Qwen3TTSModel.from_pretrained(config.QWEN_MODEL, device_map=DEVICE, dtype=DTYPE)
-        print(f"ready in {time.time() - t0:.0f}s", flush=True)
+        log.info("ready in %.0fs; %s", time.time() - t0, gpu_mem())
     except Exception as exc:  # noqa: BLE001
         LOAD_ERROR = f"{type(exc).__name__}: {exc}"
-        print("model load failed:", LOAD_ERROR, flush=True)
+        log.error("model load failed: %s", LOAD_ERROR)
 
 
 threading.Thread(target=load_model, daemon=True).start()
@@ -111,7 +125,7 @@ def run_batch(jobs: list[dict]) -> list:
     retried = set()
     bad = [i for i, (_x, info) in enumerate(trimmed) if info["ran_on"]]
     if bad:
-        print(f"{len(bad)} clip(s) still speaking at the cap: generating them again", flush=True)
+        log.warning("%d clip(s) still speaking at the cap: generating them again", len(bad))
         again, _ = generate([jobs[i] for i in bad], budget)
         for i, w in zip(bad, again):
             retried.add(i)
@@ -125,12 +139,13 @@ def run_batch(jobs: list[dict]) -> list:
             os.makedirs(os.path.dirname(j["out"]), exist_ok=True)
             sf.write(j["out"], clip, sr)
             results.append({"ok": True, "seconds": seconds, "sample_rate": sr, "batch_size": n, "tail_trimmed_s": info["trimmed_s"],
-                            "retried": i in retried, "ran_on": info["ran_on"]})
+                            "retried": i in retried, "ran_on": info["ran_on"], "worker": WORKER})
         except Exception as exc:  # noqa: BLE001
             results.append(exc)
     ends = ", ".join("%.1fs" % info["speech_end"] for _c, info in trimmed)
     cuts = ", ".join("%.1fs" % info["trimmed_s"] for _c, info in trimmed)
-    print(f"batch of {n}: {seconds:.1f}s; speech ends at {ends}; tails cut: {cuts}", flush=True)
+    log.info("generated %d clip(s) in %.1fs (budget %d tokens, %d retried); speech ends at %s; tails cut: %s; %s",
+             n, seconds, budget, len(retried), ends, cuts, gpu_mem())
     return results
 
 
