@@ -60,6 +60,11 @@ STT_LANGUAGE = "en-IN"
 STT_TIMEOUT_S = 30
 MIN_WORDS = 2                  # fewer words than this and the recording is sent back
 MAX_PAUSE_SECONDS = 1.5        # a silence this long in the middle of the speech sends the recording back
+MIN_SNR_DB = 12.0              # more room noise than this sends the recording back (speech to text got words wrong from about 10 dB down, and the clones copy the noise)
+# Optional: send the recording back if the words heard are not the sentence on the screen (catches speech to text inventing words on a bad recording).
+# Off by default because the clones say whatever the person said. 0.6 lets small misreads through.
+REQUIRE_SENTENCE_MATCH = False
+SENTENCE_MAX_WORD_ERROR = 0.6
 
 # Cloning engines, in slot order. A new engine is one file in engines/ plus its name here.
 # Cards shown to the user = 1 real + one per engine, so three engines give four cards.

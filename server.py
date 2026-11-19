@@ -101,7 +101,7 @@ async def upload_recording(sid: str, file: UploadFile = File(...)):
         d = store.path(sid)
         audio.write_wav(d / "original.wav", x)
         store.write(sid, "recording.json", {**verdict, "browser_sample_rate": sr, "at": time.time(), "longest_pause": review["longest_pause"],
-                                            "fillers": review["fillers"], "stt_error": review["stt_error"]})
+                                            "fillers": review["fillers"], "stt_error": review["stt_error"], "snr_db": review["snr_db"]})
         consent = store.read(sid, "consent.json", {})
         if consent.get("retain"):
             # Agreed to keep it: copy into the numbered voice bank now, so it is not lost if they close the tab before Finish.

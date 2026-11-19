@@ -25,6 +25,10 @@ check(ff("Please transfer the amount to my savings account.") == [], "no fillers
 check(ff("The umbrella, the human, the hummingbird and the error") == [], "words that merely contain um, hm or er are not fillers")
 check(ff("") == [], "empty text is fine")
 
+wer = speech_check.word_error_rate
+check(wer("Show me my balance", "show me my balance.") == 0.0, "word error ignores case and punctuation")
+check(wer("Show me my balance", "so in this lecture we talk") >= 0.75, "unrelated words score a high word error")
+
 # review() with a stand-in for speech to text (no network)
 silent = np.zeros(4 * 16000, dtype=np.float32)
 real_transcribe = speech_check.stt.transcribe
@@ -51,6 +55,13 @@ check(any("could not make out" in i for i in r["issues"]), "no words found sends
 speech_check.stt.transcribe = lambda _w: {"text": "show me my last five transactions", "seconds": 0.1, "language": "en-IN"}
 r = speech_check.review(silent)
 check(not r["issues"] and r["transcript"] == "show me my last five transactions", "clean words pass and are returned as the transcript")
+config.REQUIRE_SENTENCE_MATCH, saved_sentence = True, config.SENTENCE
+config.SENTENCE = "Show me my last five transactions"
+speech_check.stt.transcribe = lambda _w: {"text": "so in this lecture we are going to talk about the basics", "seconds": 0.1, "language": "en-IN"}
+check(any("not the sentence" in i for i in speech_check.review(silent)["issues"]), "optional check: words that are not the screen sentence are sent back")
+speech_check.stt.transcribe = lambda _w: {"text": "show me my last five transaction", "seconds": 0.1, "language": "en-IN"}
+check(not speech_check.review(silent)["issues"], "optional check: a small misreading passes")
+config.REQUIRE_SENTENCE_MATCH, config.SENTENCE = False, saved_sentence
 speech_check.stt.transcribe = real_transcribe
 
 if len(sys.argv) > 1:
@@ -67,6 +78,17 @@ if len(sys.argv) > 1:
           f"the inserted pause is over the limit ({config.MAX_PAUSE_SECONDS} s) and the original clip is not ({base['longest_pause']} s)")
     lead = np.concatenate([np.zeros(int(3 * 16000), dtype="float32"), x, np.zeros(int(3 * 16000), dtype="float32")])
     check(abs(speech_check.pause_report(lead)["longest_pause"] - base["longest_pause"]) < 0.1, "silence before and after the speech is ignored")
+    # background noise: the estimate follows the real noise level, and a noisy recording is sent back
+    rng = np.random.default_rng(0)
+
+    def noisy(snr):
+        return np.clip(x + rng.standard_normal(len(x)).astype(np.float32) * np.sqrt(np.mean(x ** 2) / 10 ** (snr / 10)), -1, 1)
+    s_clean, s20, s3 = (speech_check.pause_report(v)["snr_db"] for v in (x, noisy(20), noisy(3)))
+    check(s_clean > 25 and 15 < s20 < 27 and s3 < config.MIN_SNR_DB, f"noise estimate follows the real noise: clean {s_clean} dB, 20 dB noise gives {s20}, 3 dB noise gives {s3}")
+    speech_check.stt.transcribe = lambda _w: {"text": "show me my last five transactions", "seconds": 0.1, "language": "en-IN"}
+    check(not any("noise" in i for i in speech_check.review(x)["issues"]), "a clean recording is not sent back for noise")
+    check(any("background noise" in i for i in speech_check.review(noisy(3))["issues"]), "a recording with loud background noise is sent back")
+    speech_check.stt.transcribe = real_transcribe
 else:
-    print("(pause checks skipped: pass a speech recording as an argument)")
+    print("(pause and noise checks skipped: pass a speech recording as an argument)")
 print("ALL PASSED")
