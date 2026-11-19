@@ -1,22 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, ErrorNote } from "./ui";
-import { api } from "../lib/api";
-import { buildCertificate } from "../lib/certificate";
-
-const FILE_NAME = "voice-challenge-certificate.png";
+import { buildShareImage } from "../lib/shareImage";
+import { fetchWaveform, seededWaveform } from "../lib/waveform";
+import { SHARE_FILE_NAME, SHARE_URL } from "../lib/shareConfig";
 
 function triggerDownload(blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = FILE_NAME;
+  link.download = SHARE_FILE_NAME;
   document.body.appendChild(link);
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function CertificateCard({ sid }) {
+// The picture the player posts. cloneCount: fake voices in the round. audioUrl: the player's own clip, drawn as the waveform.
+export function ShareCard({ sid, cloneCount, audioUrl }) {
   const [preview, setPreview] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -29,70 +29,60 @@ export function CertificateCard({ sid }) {
     startedRef.current = true;
     (async () => {
       try {
-        let spottedRate;
+        let waveform;
         try {
-          const stats = await api("/api/stats");
-          const guests = stats.guests || 0;
-          if (guests > 0) spottedRate = Math.round(((stats.identified || 0) / guests) * 100);
+          waveform = audioUrl ? await fetchWaveform(audioUrl) : seededWaveform(sid);
         } catch {
-          spottedRate = undefined;
+          waveform = seededWaveform(sid); // the picture is still made if the clip cannot be read
         }
-        const { blob, dataUrl } = await buildCertificate({
-          date: new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }),
-          code: sid,
-          spottedRate,
-        });
+        const { blob, dataUrl } = await buildShareImage({ waveform, cloneCount, code: sid });
         blobRef.current = blob;
         setPreview(dataUrl);
       } catch (err) {
-        setError(err.message || "The certificate could not be created.");
+        setError(err.message || "The image could not be created.");
       } finally {
         setLoading(false);
       }
     })();
-  }, [sid]);
+  }, [sid, cloneCount, audioUrl]);
 
   async function onShare() {
+    setError("");
     try {
       const blob = blobRef.current;
       if (!blob) return;
-      const file = new File([blob], FILE_NAME, { type: "image/png" });
+      const file = new File([blob], SHARE_FILE_NAME, { type: "image/png" });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
-          title: "Real or Clone — The Voice Challenge",
-          text: "I identified my own real voice among the best AI voice clones!",
+          title: "Real or Clone",
+          text: `I identified my original voice among ${cloneCount} deep fake${cloneCount === 1 ? "" : "s"}! Can you tell your voice from a clone? ${SHARE_URL}`,
         });
       } else {
         triggerDownload(blob);
-        setNote("Sharing isn't supported here, so we downloaded the image for you to post.");
+        setNote("Sharing is not available here, so the image was saved. You can post it from your files.");
       }
     } catch (err) {
-      if (!(err && err.name === "AbortError")) setError("Sharing failed. Try Download instead.");
+      if (!(err && err.name === "AbortError")) setError("Sharing did not work. Try Download instead.");
     }
   }
 
   return (
     <div className="w-full max-w-md rounded-[28px] border-2 border-line bg-card p-5 text-center shadow-[0_18px_40px_-32px_rgba(40,30,10,0.55)] sm:p-7">
-      <h2 className="font-display text-2xl leading-tight sm:text-3xl">Your certificate</h2>
-
       {loading ? (
-        <p className="mt-3 text-sm text-muted">Preparing your certificate…</p>
+        <p className="text-sm text-muted">Getting your image ready…</p>
       ) : (
         <>
           {preview && (
             <img
               src={preview}
-              alt="Your certificate"
-              className="mx-auto mt-4 w-full max-w-[260px] rounded-2xl border border-line shadow-[0_18px_40px_-32px_rgba(40,30,10,0.55)]"
+              alt="Your image to share"
+              className="mx-auto w-full max-w-[300px] rounded-2xl border border-line shadow-[0_18px_40px_-32px_rgba(40,30,10,0.55)]"
             />
           )}
-
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <Button primary className="w-full sm:w-auto" onClick={() => blobRef.current && triggerDownload(blobRef.current)}>
-              Download
-            </Button>
-            <Button className="w-full sm:w-auto" onClick={onShare}>Share</Button>
+            <Button primary className="w-full sm:w-auto" onClick={onShare}>Share</Button>
+            <Button className="w-full sm:w-auto" onClick={() => blobRef.current && triggerDownload(blobRef.current)}>Download</Button>
           </div>
         </>
       )}
