@@ -45,8 +45,18 @@ for name, clip, expect in (("too short", x[: 16000], "short"), ("silence", np.ze
 check(requests.post(f"{base}/api/sessions/{sid}/generate").status_code == 409, "cannot generate before a good recording")
 check(requests.post(f"{base}/api/sessions/{sid}/recording", files={"file": ("r.txt", b"not audio", "audio/wav")}).status_code == 400, "non-audio upload rejected")
 
+mid = len(x) // 2
+gapped = np.concatenate([x[:mid], np.zeros(int(2.8 * sr), dtype=np.float32), x[mid:]])
+v = requests.post(f"{base}/api/sessions/{sid}/recording", files={"file": ("r.wav", wav_bytes(gapped, sr), "audio/wav")}).json()
+check(not v["ok"] and any("pause" in i for i in v["issues"]), f"a 2.8 s pause in the middle is sent back: {v['issues']}")
+if len(sys.argv) > 3:       # optional: a recording with "um" / "uh" in it (for example Sarvam text-to-speech saying them)
+    fx, fsr = sf.read(sys.argv[3], dtype="float32")
+    v = requests.post(f"{base}/api/sessions/{sid}/recording", files={"file": ("r.wav", wav_bytes(fx if fx.ndim == 1 else fx.mean(axis=1), fsr), "audio/wav")}).json()
+    check(not v["ok"] and any("hesitation" in i for i in v["issues"]), f"a recording with um / uh is sent back: {v['issues']}")
+
 v = requests.post(f"{base}/api/sessions/{sid}/recording", files={"file": ("r.wav", wav_bytes(x, sr), "audio/wav")}).json()
 check(v["ok"], f"good recording accepted ({v['seconds']} s, {v['level_dbfs']} dBFS)")
+check(bool(v.get("transcript")), f"words found by speech to text: {v.get('transcript')!r}")
 t0 = time.time()
 check(requests.post(f"{base}/api/sessions/{sid}/generate").json()["state"] == "running", "generation started")
 while True:

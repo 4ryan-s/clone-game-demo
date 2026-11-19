@@ -27,6 +27,13 @@ def to_16k(x: np.ndarray, sr: int) -> np.ndarray:
     return resample_poly(x, SR // g, sr // g).astype(np.float32)
 
 
+def to_wav_bytes(x: np.ndarray, sr: int = SR) -> bytes:
+    """The clip as 16-bit mono WAV bytes (for sending to speech to text without writing a file)."""
+    buf = io.BytesIO()
+    sf.write(buf, np.clip(x, -1.0, 1.0), sr, format="WAV", subtype="PCM_16")
+    return buf.getvalue()
+
+
 def write_wav(path, x: np.ndarray, sr: int = SR) -> None:
     sf.write(str(path), np.clip(x, -1.0, 1.0), sr, subtype="PCM_16")
 

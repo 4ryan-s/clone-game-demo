@@ -25,6 +25,7 @@ import engines
 import game
 import pipeline
 import scoring
+import speech_check
 import stats
 import store
 import voicebank
@@ -113,6 +114,13 @@ async def upload_recording(sid: str, file: UploadFile = File(...)):
         raise HTTPException(400, str(exc))
     x = audio.to_16k(x, sr)
     verdict = audio.check_recording(x)
+    review = None
+    if verdict["ok"]:
+        # Words, hesitation sounds and long pauses. Runs in a thread: it calls Sarvam and the speech detector, which must not block the server.
+        review = await asyncio.to_thread(speech_check.review, x)
+        verdict["issues"] += review["issues"]
+        verdict["ok"] = not verdict["issues"]
+        verdict["transcript"] = review["transcript"]
     if verdict["ok"]:
         d = store.path(sid)
         first_recording = store.read(sid, "recording.json", None) is None   # re-records should not be counted again
@@ -125,7 +133,7 @@ async def upload_recording(sid: str, file: UploadFile = File(...)):
             # Agreed to keep it: copy into the numbered voice bank now, so it is not lost if they close the tab before Finish.
             # A re-record replaces the earlier take under the same number. No agreement: nothing is copied anywhere.
             try:
-                voicebank.save(sid, d / "original.wav", consent.get("version", ""), verdict["seconds"])
+                voicebank.save(sid, d / "original.wav", consent.get("version", ""), verdict["seconds"], verdict.get("transcript") or "")
             except OSError as exc:
                 log.error("could not save the voice sample for %s: %s", sid, exc)
                 raise HTTPException(500, "Your recording could not be saved. Please try again.")
