@@ -2,27 +2,22 @@ import { useState } from "react";
 import { Button, ErrorNote, StepHead } from "./ui";
 import { VoiceCard } from "./VoiceCard";
 
-export function GameStep({ cardIds, player, onLock }) {
+export function GameStep({ sid, cardIds, onLock }) {
   const [picked, setPicked] = useState(null);
   const [heard, setHeard] = useState([]);
+  const [active, setActive] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  async function play(id) {
-    setError("");
-    try {
-      await player.toggle(id);
-      setHeard((current) => (current.includes(id) ? current : [...current, id]));
-    } catch {
-      setError("The audio could not be played. Try again.");
-    }
+  function start(id) {
+    setActive(id);
+    setHeard((current) => (current.includes(id) ? current : [...current, id]));
   }
 
   async function lock() {
     if (!picked) return;
     setBusy(true);
     setError("");
-    player.stop();
     try {
       await onLock(picked);
     } catch (err) {
@@ -33,16 +28,16 @@ export function GameStep({ cardIds, player, onLock }) {
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col">
-      <StepHead title="Which one is you?" />
+      <StepHead title="Listen and find your voice" />
 
-      <div className="mt-7 grid w-full grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+      <div className="mt-4 grid w-full grid-cols-2 gap-3 sm:mt-7 sm:gap-5">
         {cardIds.map((id, index) => (
           <div key={id} className="rise" style={{ animationDelay: `${index * 70}ms` }}>
             <VoiceCard
               letter={String.fromCharCode(65 + index)}
-              playing={player.playingId === id}
-              progress={player.progress}
-              onPlay={() => play(id)}
+              src={`/api/sessions/${sid}/cards/${id}.wav`}
+              active={active === id}
+              onStart={() => start(id)}
               selected={picked === id}
               heard={heard.includes(id)}
               onPick={() => setPicked(id)}

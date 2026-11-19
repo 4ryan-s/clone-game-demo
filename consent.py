@@ -26,7 +26,7 @@ CONSENT = {
     },
     "optional": {
         "id": "retain",
-        "label": "Optional: you may keep my own recording and a text version of what I said, and use them to train and test our voice-fraud detection. "
-                 "They will be stored without my name, filed under a number and my session code, and will not be shared outside the company.",
+        "label": "If you agree, we may use your recording to train and test our voice-fraud detection system. "
+                 "It will be stored anonymously and will not be shared outside the company.",
     },
 }

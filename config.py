@@ -100,6 +100,8 @@ QWEN_TIMEOUT_S = 240       # one clip takes 15-50 s; a request that just missed 
 
 HF_HOME = MODELS_DIR / "hf"
 SARVAM_TIMEOUT_S = 90
+SARVAM_MAX_RETRIES = 1        # on HTTP 429 (rate limit): retry a clone at most once, so a throttle does not trigger a burst of extra calls
+SARVAM_RETRY_BASE_S = 4.0     # wait before the single retry (unless the server sends a longer Retry-After header)
 
 # Shown on the consent page as the person to contact to delete a recording. Leave empty to say "ask the demo host".
 CONTACT = ""

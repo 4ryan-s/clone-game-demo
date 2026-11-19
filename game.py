@@ -10,6 +10,7 @@ import soundfile as sf
 import audio
 import config
 import scoring
+import stats
 import store
 
 
@@ -62,10 +63,18 @@ def playback_wav(sid: str, card: dict) -> bytes:
 
 def pick(sid: str, card_id: str) -> dict:
     """Record the participant's pick (the first one stands) and return the reveal."""
+    first = False
+
     def fn(m):
+        nonlocal first
         if "pick" not in m:
             m["pick"] = card_id
+            first = True
     meta = store.update_meta(sid, fn)
+    if first:
+        cards = meta.get("cards", [])
+        won = any(c["id"] == meta["pick"] and c["kind"] == "real" for c in cards)
+        stats.record_attempt(won, len(cards))
     return reveal(sid, meta)
 
 

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./lib/api";
-import { usePlayer } from "./hooks/usePlayer";
 import { Shell } from "./components/Shell";
 import { Boot } from "./components/Boot";
 import { ConsentStep } from "./components/ConsentStep";
@@ -20,7 +19,6 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [bye, setBye] = useState({ title: "", text: "" });
   const handedOff = useRef(false);
-  const player = usePlayer(sid);
 
   const init = useCallback(async () => {
     setPhase("loading");
@@ -40,7 +38,6 @@ export default function App() {
   }, [init]);
 
   function restart() {
-    player.stop();
     handedOff.current = false;
     setSid(null);
     setRetain(false);
@@ -92,20 +89,18 @@ export default function App() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ card }),
     });
-    player.stop();
     setResult(reveal);
     setPhase("result");
   }
 
-  async function finish() {
-    player.stop();
+   async function finish() {
     try {
       const done = await api(`/api/sessions/${sid}/finish`, { method: "POST" });
       setBye({
         title: "Thank you",
         text: done.deleted
-          ? "Your recording and the copies have been deleted."
-          : "Your recording is saved without your name. The copies have been deleted.",
+          ? "Your recording and the cloned voices have been deleted."
+          : "Your recording is saved without your name. The cloned voices have been deleted.",
       });
     } catch (err) {
       setBye({ title: "Thank you", text: err.message });
@@ -129,12 +124,11 @@ export default function App() {
       {phase === "making" && (
         <MakingStep sid={sid} cloneCount={cfg.clone_count} onReady={copiesReady} />
       )}
-      {phase === "game" && <GameStep cardIds={cardIds} player={player} onLock={lock} />}
+      {phase === "game" && <GameStep sid={sid} cardIds={cardIds} onLock={lock} />}
       {phase === "result" && result && (
         <ResultStep
           result={result}
           cardIds={cardIds}
-          player={player}
           retain={retain}
           sid={sid}
           onFinish={finish}
