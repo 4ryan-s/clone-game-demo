@@ -91,7 +91,8 @@ def host_main():
             stop.wait(2)
 
     threading.Thread(target=watch, daemon=True).start()
-    cmd = ["docker", "compose", "exec", "-T", "api", "python", "tests/load_test.py", "--inner"] + sys.argv[1:]
+    # through /entrypoint.sh, which puts the CUDA libraries on the library path (docker exec skips it; the GPU clone check needs it)
+    cmd = ["docker", "compose", "exec", "-T", "api", "sh", "/entrypoint.sh", "python", "tests/load_test.py", "--inner"] + sys.argv[1:]
     out("$ " + " ".join(cmd))
     proc = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     for ln in proc.stdout:
