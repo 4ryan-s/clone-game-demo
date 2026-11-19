@@ -9,6 +9,8 @@ const api = {
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // automatic runtime so JSX does not depend on a global React
+  esbuild: { jsx: "automatic" },
   server: { port: 5173, proxy: api },
   preview: { port: 4173, proxy: api },
 });

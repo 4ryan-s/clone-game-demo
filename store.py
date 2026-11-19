@@ -1,8 +1,8 @@
 """Where a session lives on disk:  data/sessions/<id>/
     consent.json   what the participant agreed to, which wording version, when
     original.wav   their recording, 16 kHz mono PCM16
-    raw/<engine>.wav   what each engine produced, untouched
-    clones/<slot>.wav  the same clips at 16 kHz mono PCM16, which is what the game plays and scores
+    raw/<engine>.wav   the engine's file, deleted as soon as the playback clip is written
+    clones/<slot>.wav  the playback clips, deleted with this folder when the session ends
     meta.json      slot-to-engine mapping, timings, errors (never sent to the browser before the pick)
 This folder is working data only and is deleted when the session ends, whatever the participant agreed to.
 A participant who agreed to keep their recording has it copied into data/voice_samples/ (see voicebank.py).

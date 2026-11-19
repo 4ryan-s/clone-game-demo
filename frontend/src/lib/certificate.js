@@ -81,8 +81,8 @@ function confetti(ctx, W) {
   });
 }
 
-// Returns { blob, dataUrl }.
-export async function buildCertificate({ date, code }) {
+// Returns { blob, dataUrl }. spottedRate is the percent of players who found their real voice.
+export async function buildCertificate({ date, code, spottedRate }) {
   const W = 1080;
   const H = 1920;
   const canvas = document.createElement("canvas");
@@ -147,8 +147,19 @@ export async function buildCertificate({ date, code }) {
     y += 62;
   }
 
-  // Badge.
-  drawBadge(ctx, W / 2, 1360, 185);
+  if (typeof spottedRate === "number") {
+    ctx.fillStyle = ACCENT;
+    ctx.font = "600 42px 'Outfit', system-ui, sans-serif";
+    const stat = `You were among the ${spottedRate}% of people who detected their original voice.`;
+    y += 36;
+    for (const line of wrapLines(ctx, stat, W - 220)) {
+      ctx.fillText(line, W / 2, y);
+      y += 58;
+    }
+  }
+
+  // Badge. Lower it when the comparison line is present so the two don't collide.
+  drawBadge(ctx, W / 2, typeof spottedRate === "number" ? 1480 : 1360, 170);
 
   // Footer.
   ctx.fillStyle = MUTED;
@@ -159,7 +170,7 @@ export async function buildCertificate({ date, code }) {
   if (code) {
     ctx.fillStyle = INK;
     ctx.font = "600 26px 'Outfit', system-ui, sans-serif";
-    ctx.fillText(`Session code: ${code}`, W / 2, 1816);
+    ctx.fillText(`Code: ${code}`, W / 2, 1816);
   }
 
   const dataUrl = canvas.toDataURL("image/png");

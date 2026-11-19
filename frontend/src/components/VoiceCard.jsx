@@ -57,7 +57,7 @@ export function VoiceCard({ letter, src, active, onStart, selected, onPick, hear
               "inline-flex max-w-full rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white",
               reveal.real ? "bg-good" : "bg-bad",
             )}>
-              {reveal.real ? "Your real voice" : `Clone: ${reveal.who}`}
+              {reveal.real ? "Your real voice" : "Cloned voice"}
             </span>
             <p className={cx("mt-1.5 min-h-4 text-xs font-semibold", reveal.picked ? (reveal.real ? "text-good" : "text-bad") : "text-muted")}>
               {reveal.picked ? (reveal.real ? "You picked this \u2014 correct!" : "You picked this one") : "\u00a0"}

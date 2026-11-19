@@ -52,6 +52,7 @@ def _one(sid: str, eng, slot: str, text: str) -> None:
         else:
             info = eng.clone(d / "original.wav", text, text, raw)
         x, sr = audio.read_wav_bytes(raw.read_bytes())
+        raw.unlink(missing_ok=True)   # the engine's file is not kept; only the playback clip remains, and only until the session ends
         (d / "clones").mkdir(exist_ok=True)
         audio.write_wav(d / "clones" / f"{slot}.wav", audio.to_16k(x, sr))
         log.info("session %s engine %s done in %.1fs", sid, eng.name, time.time() - t0)

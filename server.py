@@ -9,14 +9,13 @@ import base64
 import json
 import logging
 import os
-import re
+import asyncio
 import shutil
-import threading
 import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -45,26 +44,6 @@ class _QuietPolling(logging.Filter):
 logging.getLogger("uvicorn.access").addFilter(_QuietPolling())
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 DEBUG = os.environ.get("DEMO_DEBUG") == "1"
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-CERT_DIR = config.ROOT / "data" / "certificates"              # saved PNGs, kept after the session ends (for the QR)
-CERTIFICATES_FILE = CERT_DIR / "log.jsonl"                    # one line per participant: who to send a goodie to
-MAX_CERT_BYTES = 6 * 1024 * 1024
-_cert_lock = threading.Lock()
-
-
-def _save_certificate_png(token: str, data_url: str) -> bool:
-    """Store the browser-made PNG under a token so a phone can fetch it later. Returns False if there was no valid image."""
-    if not data_url.startswith("data:image/png"):
-        return False
-    try:
-        raw = base64.b64decode(data_url.split(",", 1)[1], validate=True)
-    except (ValueError, IndexError):
-        return False
-    if not raw or len(raw) > MAX_CERT_BYTES:
-        return False
-    CERT_DIR.mkdir(parents=True, exist_ok=True)
-    (CERT_DIR / f"{token}.png").write_bytes(raw)
-    return True
 
 
 @asynccontextmanager
@@ -210,94 +189,6 @@ def pick(sid: str, body: PickIn):
     return game.pick(sid, body.card)
 
 
-class CertificateIn(BaseModel):
-    image: str = ""         # the finished certificate as a PNG data URL, made in the browser
-    email: str = ""         # optional: so the booth can follow up
-    name: str = ""
-    won: bool = False
-
-
-@app.post("/api/sessions/{sid}/certificate")
-def certificate(sid: str, body: CertificateIn):
-    """Save the browser-made certificate under a token and return a URL. On a shared kiosk the
-    page shows this URL as a QR code so the participant can open it on their own phone."""
-    _need(sid)
-    email = body.email.strip()
-    if email and not EMAIL_RE.match(email):
-        raise HTTPException(400, "Enter a valid email address")
-    token = store.new_id()
-    if not _save_certificate_png(token, body.image):
-        raise HTTPException(400, "The certificate image was missing or invalid")
-    entry = {"token": token, "session_id": sid, "email": email, "name": body.name.strip()[:80],
-             "won": bool(body.won), "at_iso": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
-    with _cert_lock:
-        CERT_DIR.mkdir(parents=True, exist_ok=True)
-        with CERTIFICATES_FILE.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(entry) + "\n")
-    store.write(sid, "certificate.json", {"token": token, "email": email, "name": entry["name"], "at": time.time()})
-    # On a kiosk the phone cannot reach "localhost". Set PUBLIC_BASE_URL (for example the LAN IP or public
-    # HTTPS host) and the QR will point there; otherwise the browser falls back to the page's own origin.
-    base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
-    return {"ok": True, "token": token, "url": f"{base}/c/{token}" if base else f"/c/{token}"}
-
-
-@app.get("/api/certificates/{token}.png")
-def certificate_image(token: str):
-    if not store.valid_id(token):
-        raise HTTPException(404, "Certificate not found")
-    f = CERT_DIR / f"{token}.png"
-    if not f.is_file():
-        raise HTTPException(404, "Certificate not found")
-    return FileResponse(f, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
-
-
-@app.get("/c/{token}", response_class=HTMLResponse)
-def certificate_page(token: str):
-    """Mobile-friendly page the QR points to: shows the certificate with a download/share button."""
-    if not store.valid_id(token) or not (CERT_DIR / f"{token}.png").is_file():
-        raise HTTPException(404, "Certificate not found")
-    img = f"/api/certificates/{token}.png"
-    html = """<!doctype html><html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Your certificate</title>
-<style>
-  :root { color-scheme: light; }
-  body { margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
-         gap:20px; padding:24px; background:#f3eee4; color:#1c1915;
-         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
-  h1 { font-size:22px; margin:0; text-align:center; }
-  p { margin:0; color:#6f685f; text-align:center; }
-  img { width:100%; max-width:760px; height:auto; border-radius:16px;
-        box-shadow:0 20px 50px -30px rgba(40,30,10,0.6); }
-  .row { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
-  a.btn, button.btn { appearance:none; border:none; cursor:pointer; text-decoration:none;
-        font-size:16px; font-weight:600; padding:14px 22px; border-radius:16px; }
-  .primary { background:#0f6f5b; color:#fff; }
-  .ghost { background:#fff; color:#1c1915; border:1px solid #e4dacb; }
-</style></head><body>
-  <h1>Your certificate is ready</h1>
-  <p>Collect your goodie from the booth by showing this certificate.</p>
-  <img id="cert" src="__IMG__" alt="Certificate">
-  <div class="row">
-    <a class="btn primary" href="__IMG__" download="voice-challenge-certificate.png">Download</a>
-    <button class="btn ghost" id="share">Share</button>
-  </div>
-<script>
-  var url = "__IMG__";
-  document.getElementById("share").addEventListener("click", async function () {
-    try {
-      var res = await fetch(url); var blob = await res.blob();
-      var file = new File([blob], "voice-challenge-certificate.png", { type: "image/png" });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: "Real or Clone \u2014 The Voice Challenge" });
-      } else { window.location.href = url; }
-    } catch (e) {}
-  });
-</script>
-</body></html>"""
-    return HTMLResponse(html.replace("__IMG__", img))
-
-
 @app.post("/api/sessions/{sid}/finish")
 def finish(sid: str):
     """Called when the participant is done. The working session (clones, scores, everything but the voice bank) is always
@@ -324,8 +215,11 @@ def delete_session(sid: str):
 
 @app.get("/api/stats")
 def public_stats():
-    """Totals for the consent page: guests who have played, and the voices in those rounds."""
-    return {**stats.snapshot(), "saved": voicebank.count_saved()}
+    """Totals for the booth board. Written when a player locks in a choice, before they press Finish."""
+    return JSONResponse(
+        {**stats.snapshot(), "saved": voicebank.count_saved()},
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/api/health")
@@ -349,6 +243,16 @@ if DEBUG:
         if store.path(sid).resolve() not in f.parents or not f.is_file():
             raise HTTPException(404)
         return FileResponse(f)
+
+
+@app.get("/dashboard")
+@app.get("/dashboard/")
+def dashboard_page():
+    """The big-screen booth board. The React app reads the path and renders the live stats."""
+    index = _DIST / "index.html"
+    if not index.is_file():
+        raise HTTPException(404, "The dashboard is not built yet")
+    return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
 
 # The React quiz (frontend/, built into frontend/dist) is the demo page. The first plain-HTML page stays at /classic as a fallback.
