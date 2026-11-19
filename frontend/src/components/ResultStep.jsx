@@ -44,13 +44,13 @@ export function ResultStep({ result, cardIds, sid, retain, onFinish }) {
         <div className={cx("relative flex flex-col items-center", won ? "pop" : "rise")}>
           {won ? <Stars filled={3} /> : <Stars filled={1} />}
           <h1 className="mt-4 font-display text-4xl leading-tight text-balance sm:text-5xl lg:text-6xl">
-            {won ? "Congratulations" : "A copy fooled you"}
+            {won ? "Woohoo! You got it right!" : "Oops! A cloned voice fooled you"}
           </h1>
           <p className="mt-3 text-lg text-muted">
-            {won ? "That was your voice." : real ? `Voice ${real.letter} was yours.` : "That was a copy."}
+            {won ? "That was your voice." : real ? `Voice ${real.letter} was yours.` : "That was a cloned voice."}
           </p>
           <div className="mt-8">{won ? <Medal /> : <ScorecardMark />}</div>
-          <Button primary className="mt-8 w-full max-w-xs sm:mt-10 sm:w-auto sm:min-w-52" onClick={() => setShowScores(true)}>See the copies</Button>
+          <Button primary className="mt-8 w-full max-w-xs sm:mt-10 sm:w-auto sm:min-w-52" onClick={() => setShowScores(true)}>See the cloned voices</Button>
         </div>
       </div>
     );
@@ -59,7 +59,7 @@ export function ResultStep({ result, cardIds, sid, retain, onFinish }) {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div className="text-center">
-        <h1 className="font-display text-3xl leading-tight text-balance sm:text-4xl">{won ? "You found your voice" : "A copy fooled you"}</h1>
+        <h1 className="font-display text-3xl leading-tight text-balance sm:text-4xl">{won ? "Woohoo! You found your voice" : "Oops! A cloned voice fooled you"}</h1>
         {real && <p className="mt-2 text-muted">Voice {real.letter} was yours.</p>}
       </div>
 
@@ -86,14 +86,11 @@ export function ResultStep({ result, cardIds, sid, retain, onFinish }) {
 
       <footer className="flex flex-col items-center gap-4 pt-1">
         {won && <CertificateCard sid={sid} />}
-        <p className="text-sm text-muted">
-          Code <strong className="ml-1 rounded-lg bg-card px-2 py-1 font-mono text-sm text-ink ring-1 ring-line">{sid}</strong>
-        </p>
-        <p className="max-w-md text-center text-sm text-muted">
-          {retain
-            ? "You agreed to keep your own recording. It is saved without your name when you finish. The copies are deleted."
-            : "You did not agree to keep your recording, so it is deleted with the copies when you finish."}
-        </p>
+        {won && retain && (
+          <p className="max-w-md text-center text-sm text-muted">
+            Thank you for agreeing to let us save your voice to train future models!
+          </p>
+        )}
         <ErrorNote>{error}</ErrorNote>
         <Button primary disabled={!!closing} onClick={finish}>{closing ? "Finishing…" : "Finish"}</Button>
       </footer>

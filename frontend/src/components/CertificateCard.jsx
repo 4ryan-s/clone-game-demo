@@ -32,7 +32,6 @@ export function CertificateCard({ sid }) {
     (async () => {
       try {
         const { blob, dataUrl } = await buildCertificate({
-          code: sid,
           date: new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }),
         });
         blobRef.current = blob;

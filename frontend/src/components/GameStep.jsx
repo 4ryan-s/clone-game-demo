@@ -28,7 +28,7 @@ export function GameStep({ sid, cardIds, onLock }) {
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col">
-      <StepHead title="Which one is you?" />
+      <StepHead title="Listen and find your voice" />
 
       <div className="mt-4 grid w-full grid-cols-2 gap-3 sm:mt-7 sm:gap-5">
         {cardIds.map((id, index) => (

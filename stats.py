@@ -5,6 +5,7 @@ data/stats.json
     identified   of those, people who picked their own voice
     missed       of those, people who picked a clone
     voices       real recordings plus clones that were in those rounds
+    recorded     people who made a recording, whether or not they agreed to keep it ("voices created")
 """
 import json
 import threading
@@ -13,12 +14,20 @@ import config
 
 _lock = threading.Lock()
 _PATH = config.ROOT / "data" / "stats.json"
-_EMPTY = {"guests": 0, "identified": 0, "missed": 0, "voices": 0}
+_EMPTY = {"guests": 0, "identified": 0, "missed": 0, "voices": 0, "recorded": 0}
 
 
 def snapshot() -> dict:
     with _lock:
         return dict(_read())
+
+
+def record_recording() -> None:
+    """Count one participant's first accepted recording (both those who keep it and those who do not)."""
+    with _lock:
+        stats = _read()
+        stats["recorded"] += 1
+        _save(stats)
 
 
 def record_attempt(won: bool, voices: int) -> None:
@@ -28,10 +37,14 @@ def record_attempt(won: bool, voices: int) -> None:
         stats["guests"] += 1
         stats["identified" if won else "missed"] += 1
         stats["voices"] += max(0, int(voices))
-        _PATH.parent.mkdir(parents=True, exist_ok=True)
-        tmp = _PATH.with_suffix(".tmp")
-        tmp.write_text(json.dumps(stats), encoding="utf-8")
-        tmp.replace(_PATH)
+        _save(stats)
+
+
+def _save(stats: dict) -> None:
+    _PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = _PATH.with_suffix(".tmp")
+    tmp.write_text(json.dumps(stats), encoding="utf-8")
+    tmp.replace(_PATH)
 
 
 def _read() -> dict:

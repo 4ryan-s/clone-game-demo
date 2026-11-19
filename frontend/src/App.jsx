@@ -99,8 +99,8 @@ export default function App() {
       setBye({
         title: "Thank you",
         text: done.deleted
-          ? "Your recording and the copies have been deleted."
-          : "Your recording is saved without your name. The copies have been deleted.",
+          ? "Your recording and the cloned voices have been deleted."
+          : "Your recording is saved without your name. The cloned voices have been deleted.",
       });
     } catch (err) {
       setBye({ title: "Thank you", text: err.message });

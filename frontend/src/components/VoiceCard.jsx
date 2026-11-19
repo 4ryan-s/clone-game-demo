@@ -13,17 +13,21 @@ export function VoiceCard({ letter, src, active, onStart, selected, onPick, hear
 
   const border = reveal
     ? reveal.real
-      ? "border-4 border-good shadow-[0_0_0_5px_rgba(21,122,69,0.2)]"
-      : "border-2 border-bad"
+      ? "border-4 border-good shadow-[0_0_0_5px_rgba(21,122,69,0.25)]"
+      : "border-2 border-bad/70"
     : selected || active ? "border-2 border-accent" : "border-2 border-line";
+  const fill = reveal
+    ? reveal.real ? "bg-good-soft" : "bg-bad-soft"
+    : "bg-card";
   const marginPct = reveal ? scorePercent(reveal.margin) : 0;
   const cutPct = reveal ? scorePercent(reveal.cutoff) : 0;
 
   return (
     <article className={cx(
-      "flex min-h-0 flex-col overflow-hidden rounded-[28px] bg-card text-center shadow-[0_18px_40px_-32px_rgba(40,30,10,0.55)] transition duration-200",
+      "flex min-h-0 flex-col overflow-hidden rounded-[28px] text-center shadow-[0_18px_40px_-32px_rgba(40,30,10,0.55)] transition duration-200",
       reveal ? "h-full px-2.5 py-2.5 sm:px-3 sm:py-3" : "h-auto px-2.5 py-3 sm:px-4 sm:py-4",
       border,
+      fill,
       !reveal && selected && "-translate-y-1 shadow-[0_0_0_6px_rgba(15,111,91,0.14)]",
       !reveal && !selected && "hover:-translate-y-1",
     )}>
@@ -32,6 +36,11 @@ export function VoiceCard({ letter, src, active, onStart, selected, onPick, hear
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">Voice</p>
           <h2 className={cx("font-display leading-none", reveal ? "text-xl sm:text-2xl" : "text-3xl sm:text-5xl")}>{letter}</h2>
         </div>
+        {reveal && reveal.picked && (
+          <span className="rounded-full bg-ink px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+            Your pick
+          </span>
+        )}
       </div>
 
       {!reveal && (
@@ -50,10 +59,12 @@ export function VoiceCard({ letter, src, active, onStart, selected, onPick, hear
             )}>
               {reveal.real ? "Your real voice" : `Clone: ${reveal.who}`}
             </span>
-            <p className="mt-1.5 min-h-4 text-xs text-muted">{reveal.picked ? "You picked this one" : "\u00a0"}</p>
+            <p className={cx("mt-1.5 min-h-4 text-xs font-semibold", reveal.picked ? (reveal.real ? "text-good" : "text-bad") : "text-muted")}>
+              {reveal.picked ? (reveal.real ? "You picked this \u2014 correct!" : "You picked this one") : "\u00a0"}
+            </p>
             <div className="mt-1 flex flex-wrap items-end justify-between gap-1">
               <p className="font-display text-xl leading-none tabular-nums sm:text-2xl">{formatMargin(reveal.margin)}</p>
-              <p className="pb-0.5 text-xs text-muted">{reveal.saysClone ? "Called a clone" : "Passed as real"}</p>
+              <p className="pb-0.5 text-xs text-muted">{reveal.saysClone ? "Cloned voice" : "Passed as real"}</p>
             </div>
             <div
               className="relative mt-2 h-2 rounded-full"

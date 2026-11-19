@@ -197,7 +197,7 @@ export function RecordStep({ sentence, maxSeconds, onSubmit }) {
                 {recording ? <span className="h-7 w-7 rounded-md bg-white" /> : <MicIcon />}
               </button>
             </div>
-            <p className="mt-3 text-lg font-semibold">{recording ? "Stop" : arming ? "Starting…" : "Record"}</p>
+            <p className="mt-3 text-lg font-semibold">{recording ? "Stop" : arming ? "Starting…" : "Tap to Record"}</p>
           </>
         )}
 

@@ -115,8 +115,11 @@ async def upload_recording(sid: str, file: UploadFile = File(...)):
     verdict = audio.check_recording(x)
     if verdict["ok"]:
         d = store.path(sid)
+        first_recording = store.read(sid, "recording.json", None) is None   # re-records should not be counted again
         audio.write_wav(d / "original.wav", x)
         store.write(sid, "recording.json", {**verdict, "browser_sample_rate": sr, "at": time.time()})
+        if first_recording:
+            stats.record_recording()
         consent = store.read(sid, "consent.json", {})
         if consent.get("retain"):
             # Agreed to keep it: copy into the numbered voice bank now, so it is not lost if they close the tab before Finish.
@@ -303,7 +306,7 @@ def delete_session(sid: str):
 @app.get("/api/stats")
 def public_stats():
     """Totals for the consent page: guests who have played, and the voices in those rounds."""
-    return stats.snapshot()
+    return {**stats.snapshot(), "saved": voicebank.count_saved()}
 
 
 @app.get("/api/health")

@@ -2,8 +2,7 @@
 // a canvas. Everything is client-side so the participant gets it instantly.
 const LOGO_SRC = "/josh-logo.png";
 const EVENT = "Real or Clone \u2014 The Voice Challenge";
-const BODY = "You identified your own original voice from the best AI-cloned model voices.";
-const GOODIE = "Collect your goodie from the booth by showing this certificate.";
+const BODY = "You successfully identified your original voice among AI-generated voice clones!";
 
 const INK = "#1c1915";
 const MUTED = "#6f685f";
@@ -18,20 +17,6 @@ function loadImage(src) {
     img.onerror = reject;
     img.src = src;
   });
-}
-
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  if (ctx.roundRect) {
-    ctx.roundRect(x, y, w, h, r);
-  } else {
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
-  }
 }
 
 function wrapLines(ctx, text, maxWidth) {
@@ -97,7 +82,7 @@ function confetti(ctx, W) {
 }
 
 // Returns { blob, dataUrl }.
-export async function buildCertificate({ code, date }) {
+export async function buildCertificate({ date }) {
   const W = 1080;
   const H = 1920;
   const canvas = document.createElement("canvas");
@@ -163,31 +148,14 @@ export async function buildCertificate({ code, date }) {
   }
 
   // Badge.
-  drawBadge(ctx, W / 2, 1230, 170);
-
-  // Goodie box.
-  const boxW = W - 180;
-  const boxH = 180;
-  const boxX = 90;
-  const boxY = 1470;
-  ctx.fillStyle = "#e4f5ea";
-  roundRect(ctx, boxX, boxY, boxW, boxH, 28);
-  ctx.fill();
-  ctx.fillStyle = INK;
-  ctx.font = "700 38px 'Outfit', system-ui, sans-serif";
-  const goodieLines = wrapLines(ctx, GOODIE, boxW - 100);
-  let gy = boxY + boxH / 2 - (goodieLines.length - 1) * 26 + 12;
-  for (const line of goodieLines) {
-    ctx.fillText(line, W / 2, gy);
-    gy += 52;
-  }
+  drawBadge(ctx, W / 2, 1360, 185);
 
   // Footer.
   ctx.fillStyle = MUTED;
   ctx.font = "600 32px 'Outfit', system-ui, sans-serif";
-  ctx.fillText(EVENT, W / 2, 1744);
+  ctx.fillText(EVENT, W / 2, 1710);
   ctx.font = "600 28px 'Outfit', system-ui, sans-serif";
-  ctx.fillText(`Code ${code}   \u2022   ${date}`, W / 2, 1800);
+  ctx.fillText(date, W / 2, 1764);
 
   const dataUrl = canvas.toDataURL("image/png");
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));

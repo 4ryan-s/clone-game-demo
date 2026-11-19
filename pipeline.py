@@ -1,6 +1,5 @@
 """Makes the clones for one session: every enabled engine runs at the same time on the participant's recording.
 Slots are neutral ids ("c1", "c2", ...) so nothing sent to the browser names an engine."""
-import contextlib
 import logging
 import threading
 import time
@@ -13,8 +12,16 @@ import store
 from engines.base import EngineError
 
 log = logging.getLogger("pipeline")
-# One Qwen clone at a time on the single GPU. The next participant waits here, outside the HTTP timeout.
-_locks = {"qwen3tts": threading.Lock()}
+# Engines that must not run at the same time hold a shared lock, keyed by eng.lock_key:
+#   - "qwen3tts": one Qwen clone at a time on the single GPU (the next participant waits here, outside the HTTP timeout).
+#   - "sarvam":   both Sarvam clones share one remote rate limit, so they go one after another, not together.
+_locks: dict[str, threading.Lock] = {}
+_locks_guard = threading.Lock()
+
+
+def _lock_for(eng) -> threading.Lock:
+    with _locks_guard:
+        return _locks.setdefault(eng.lock_key, threading.Lock())
 
 
 def start(sid: str) -> None:
@@ -38,7 +45,7 @@ def _one(sid: str, eng, slot: str, text: str) -> None:
         if not ok:
             raise EngineError(why)
         raw = d / "raw" / f"{eng.name}.wav"
-        with _locks.get(eng.name, contextlib.nullcontext()):
+        with _lock_for(eng):
             info = eng.clone(d / "original.wav", text, text, raw)
         x, sr = audio.read_wav_bytes(raw.read_bytes())
         (d / "clones").mkdir(exist_ok=True)
