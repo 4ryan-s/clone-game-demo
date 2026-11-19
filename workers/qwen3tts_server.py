@@ -93,6 +93,22 @@ def load_model():
 threading.Thread(target=load_model, daemon=True).start()
 
 
+BUDGET_REF_FACTOR = float(os.environ.get("QWEN_BUDGET_REF_FACTOR", "0") or 0)      # 0 = off. e.g. 1.3: cap each clip at 1.3 x the reference recording's length + 1 s
+
+
+def job_budget(job: dict) -> int:
+    """Token cap for one request. The clone says the same words as the reference recording, so it should last about as long.
+    With QWEN_BUDGET_REF_FACTOR set, the cap is tightened to that: a clip that runs on (see tailtrim) then costs the whole batch less time."""
+    base = token_budget(job["text"])
+    if BUDGET_REF_FACTOR > 0:
+        try:
+            ref_s = sf.info(job["ref"]).duration
+            return min(base, max(60, int(TOKENS_PER_SECOND * (ref_s * BUDGET_REF_FACTOR + 1.0))))
+        except Exception:  # noqa: BLE001
+            pass
+    return base
+
+
 def token_budget(text: str) -> int:
     """The model speaks about 12 tokens per second. Cap the length so a runaway tail cannot run on."""
     seconds = min(14.0, 0.6 * len(text.split()) + 2.5)
@@ -136,7 +152,7 @@ def run_batch(jobs: list[dict]) -> list:
     is cut just after the last speech (tailtrim.py). A clip still speaking at the cap is generated once more."""
     n = len(jobs)
     t0 = time.time()
-    budget = max(token_budget(j["text"]) for j in jobs)          # a clip that ends sooner simply stops earlier
+    budget = max(job_budget(j) for j in jobs)          # a clip that ends sooner simply stops earlier
     cap_s = budget / TOKENS_PER_SECOND
     wavs, sr = generate(jobs, budget)
     trimmed = [tailtrim.trim_tail(w, sr, cap_s=cap_s) for w in wavs]

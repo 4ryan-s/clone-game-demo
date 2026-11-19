@@ -25,6 +25,7 @@ services:
       QWEN_MAX_BATCH: ${QWEN_MAX_BATCH:-4}
       QWEN_BATCH_WINDOW_S: ${QWEN_BATCH_WINDOW_S:-1.0}
       PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+      QWEN_BUDGET_REF_FACTOR: ${QWEN_BUDGET_REF_FACTOR:-0}
       QWEN_GPU_MEM_FRACTION: ${QWEN_GPU_MEM_FRACTION:-0.6}
     volumes:
       - ./models:/app/models
@@ -60,7 +61,7 @@ services:
       QWEN_URLS: ${QWEN_URLS:-http://qwen:8766}
       SARVAM_API_KEY: ${SARVAM_API_KEY:-}
       HF_HOME: /app/models/hf
-      SPECTRA_DEVICE: cuda
+      SPECTRA_DEVICE: ${SPECTRA_DEVICE:-cuda}      # cpu frees about 2.2 GB of GPU memory (see .env.example)
     deploy:
       resources:
         reservations:

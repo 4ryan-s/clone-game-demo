@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ap = argparse.ArgumentParser()
 ap.add_argument("--users", type=int, default=8, help="simulated users per scenario")
 ap.add_argument("--gap", type=float, default=5.0, help="seconds between new users in the stagger scenario")
-ap.add_argument("--scenarios", default="burst,stagger", help="comma separated: burst, stagger")
+ap.add_argument("--scenarios", default="burst,stagger", help="comma separated: burst, stagger, score (times the reveal-step clone check on the current device)")
 ap.add_argument("--base", default="http://127.0.0.1:8000", help="the API as seen from where this runs")
 ap.add_argument("--timeout", type=float, default=300, help="give up on one user after this many seconds")
 ap.add_argument("--keep", action="store_true", help="do not delete the test sessions")
@@ -62,6 +62,11 @@ def host_main():
             out(f"WARNING: {len(qwens)} qwen containers are running. Each holds its own copy of the model on the GPU. Remove the ones you do not use (docker rm -f <name>).")
     except Exception:  # noqa: BLE001
         pass
+    for label, c in (("CPU cores (nproc)", ["nproc"]), ("Memory (free -h)", ["free", "-h"])):
+        try:
+            out(f"{label}: " + subprocess.run(c, capture_output=True, text=True, timeout=5).stdout.strip().replace("\n", " | "))
+        except Exception:  # noqa: BLE001
+            pass
     started = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())          # docker logs --since takes UTC when no zone is given
     stop = threading.Event()
     containers, gpu = {}, []
@@ -276,8 +281,32 @@ def run_scenario(name, recs):
             "total_p50": round(pct(totals, .5), 1) if totals else None, "total_p95": round(pct(totals, .95), 1) if totals else None}
 
 
+def run_score(recs):
+    """Time the reveal-step clone check (scoring.margin) on this container's device. Does not touch stats or sessions."""
+    import numpy as np
+    import soundfile as sf
+    import scoring
+    clips = []
+    for wav, _t in recs[:4]:
+        x, sr = sf.read(str(wav), dtype="float32")
+        clips.append(x if x.ndim == 1 else x.mean(axis=1))
+    t0 = time.time()
+    scoring.margin(clips[0])                       # first call includes loading the model
+    first = time.time() - t0
+    times = []
+    for _ in range(2):
+        for x in clips:
+            t = time.time()
+            scoring.margin(x)
+            times.append(time.time() - t)
+    print("\n=== SCORE (reveal-step clone check) ===")
+    print(f"device {scoring.device() or 'not loaded'}   first call incl. model load {first:.1f}s")
+    print(f"per clip: p50 {pct(times, .5):.2f}s  p95 {pct(times, .95):.2f}s  max {max(times):.2f}s   -> a reveal of 4 cards takes about {4 * float(np.median(times)):.1f}s")
+    return {"scenario": "score", "device": scoring.device(), "per_clip_p50": round(pct(times, .5), 2)}
+
+
 recs = load_recordings()
 print(f"{len(recs)} saved recordings available; this test uses {min(args.users, len(recs))} of them (one per simulated user, {args.users} users); "
       f"workers: {config.QWEN_URLS}; Sarvam concurrency {config.SARVAM_CONCURRENCY}", flush=True)
-summary = [run_scenario(s.strip(), recs) for s in args.scenarios.split(",") if s.strip()]
+summary = [(run_score(recs) if s.strip() == "score" else run_scenario(s.strip(), recs)) for s in args.scenarios.split(",") if s.strip()]
 print("\nSUMMARY_JSON " + json.dumps(summary))
