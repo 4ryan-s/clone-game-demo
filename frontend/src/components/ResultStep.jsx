@@ -8,6 +8,7 @@ import { cx } from "../lib/cx";
 export function ResultStep({ result, cardIds, sid, retain, onFinish }) {
   const won = result.won;
   const [showScores, setShowScores] = useState(false);
+  const [showCert, setShowCert] = useState(false);
   const [active, setActive] = useState(null);
   const [closing, setClosing] = useState("");
   const [error, setError] = useState("");
@@ -85,14 +86,17 @@ export function ResultStep({ result, cardIds, sid, retain, onFinish }) {
       </div>
 
       <footer className="flex flex-col items-center gap-4 pt-1">
-        {won && <CertificateCard sid={sid} />}
+        {won && !showCert && (
+          <Button primary className="w-full max-w-xs" onClick={() => setShowCert(true)}>View certificate</Button>
+        )}
+        {won && showCert && <CertificateCard sid={sid} />}
         {won && retain && (
           <p className="max-w-md text-center text-sm text-muted">
             Thank you for agreeing to let us save your voice to train future models!
           </p>
         )}
         <ErrorNote>{error}</ErrorNote>
-        <Button primary disabled={!!closing} onClick={finish}>{closing ? "Finishing…" : "Finish"}</Button>
+        <Button disabled={!!closing} onClick={finish}>{closing ? "Finishing…" : "Finish"}</Button>
       </footer>
     </div>
   );

@@ -24,6 +24,10 @@ CONSENT = {
         "id": "required",
         "label": "I am 18 or older. I agree that my voice is recorded and copied by voice-cloning systems, including Sarvam, for this demo.",
     },
+    "cloning": {
+        "id": "cloning",
+        "label": "I give permission for my voice to be recorded and cloned by AI voice-cloning systems for this demo.",
+    },
     "optional": {
         "id": "retain",
         "label": "If you agree, we may use your recording to train and test our voice-fraud detection system. "

@@ -84,18 +84,19 @@ def get_config():
 class ConsentIn(BaseModel):
     agree: bool
     retain: bool = False
+    cloning: bool = False
     version: str
 
 
 @app.post("/api/sessions")
 def create_session(body: ConsentIn):
-    if not body.agree:
+    if not body.agree or not body.cloning:
         raise HTTPException(400, "The required agreement was not given")
     if body.version != config.CONSENT_VERSION:
         raise HTTPException(409, "The consent wording changed. Please reload the page and read it again.")
     sid = store.new_id()
-    store.write(sid, "consent.json", {"agree": True, "retain": body.retain, "version": body.version, "at": time.time(),
-                                      "at_iso": time.strftime("%Y-%m-%dT%H:%M:%S%z")})
+    store.write(sid, "consent.json", {"agree": True, "cloning": True, "retain": body.retain, "version": body.version,
+                                      "at": time.time(), "at_iso": time.strftime("%Y-%m-%dT%H:%M:%S%z")})
     return {"session_id": sid}
 
 

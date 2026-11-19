@@ -82,7 +82,7 @@ function confetti(ctx, W) {
 }
 
 // Returns { blob, dataUrl }.
-export async function buildCertificate({ date }) {
+export async function buildCertificate({ date, code }) {
   const W = 1080;
   const H = 1920;
   const canvas = document.createElement("canvas");
@@ -156,6 +156,11 @@ export async function buildCertificate({ date }) {
   ctx.fillText(EVENT, W / 2, 1710);
   ctx.font = "600 28px 'Outfit', system-ui, sans-serif";
   ctx.fillText(date, W / 2, 1764);
+  if (code) {
+    ctx.fillStyle = INK;
+    ctx.font = "600 26px 'Outfit', system-ui, sans-serif";
+    ctx.fillText(`Session code: ${code}`, W / 2, 1816);
+  }
 
   const dataUrl = canvas.toDataURL("image/png");
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
