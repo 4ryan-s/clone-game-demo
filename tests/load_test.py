@@ -52,6 +52,16 @@ def host_main():
         print(line, flush=True)
         report.append(line)
 
+    try:
+        ps = subprocess.run(["docker", "ps", "--format", "{{.Names}} ({{.Status}})"], capture_output=True, text=True, timeout=30, cwd=ROOT).stdout.split("\n")
+        out("Running containers: " + ", ".join(x for x in ps if x))
+        used = subprocess.run(["nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=5).stdout.strip()
+        out(f"GPU memory in use BEFORE the test (MiB used, total): {used}   <- should be about 9000 with one qwen worker; a lot more means something else holds the GPU")
+        qwens = [x for x in ps if "qwen" in x]
+        if len(qwens) > 1:
+            out(f"WARNING: {len(qwens)} qwen containers are running. Each holds its own copy of the model on the GPU. Remove the ones you do not use (docker rm -f <name>).")
+    except Exception:  # noqa: BLE001
+        pass
     started = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())          # docker logs --since takes UTC when no zone is given
     stop = threading.Event()
     containers, gpu = {}, []
@@ -267,6 +277,7 @@ def run_scenario(name, recs):
 
 
 recs = load_recordings()
-print(f"Using {len(recs)} saved recording(s); workers: {config.QWEN_URLS}; Sarvam concurrency {config.SARVAM_CONCURRENCY}")
+print(f"{len(recs)} saved recordings available; this test uses {min(args.users, len(recs))} of them (one per simulated user, {args.users} users); "
+      f"workers: {config.QWEN_URLS}; Sarvam concurrency {config.SARVAM_CONCURRENCY}", flush=True)
 summary = [run_scenario(s.strip(), recs) for s in args.scenarios.split(",") if s.strip()]
 print("\nSUMMARY_JSON " + json.dumps(summary))

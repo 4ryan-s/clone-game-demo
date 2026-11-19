@@ -73,6 +73,9 @@ def load_model():
     """Load after the port is open. A health check during the load then gets a reply instead of connection refused."""
     global MODEL, ATTN, LOAD_ERROR
     log.info("loading %s on %s (%s, %s), max batch %d, window %.1fs", config.QWEN_MODEL, DEVICE, DTYPE, ATTN, MAX_BATCH, BATCH_WINDOW_S)
+    if DEVICE == "cuda:0":
+        free, total = (v // (1024 * 1024) for v in torch.cuda.mem_get_info())
+        log.info("GPU before loading: %d of %d MiB free%s", free, total, "  <- LOW: another process is holding the GPU" if free < 7000 else "")
     t0 = time.time()
     try:
         try:
