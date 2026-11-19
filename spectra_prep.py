@@ -73,6 +73,12 @@ def speech_probs(wav: np.ndarray) -> np.ndarray:
         return np.array([_vad(wav[i * _FRAME:(i + 1) * _FRAME]) for i in range(n_frames)])
 
 
+def speech_span(wav: np.ndarray) -> float:
+    """Seconds from the first to the last speech frame of a 16 kHz clip (0.0 if there is no speech). Pauses inside count."""
+    voiced = np.flatnonzero(speech_probs(wav.astype(np.float32)) >= _SPEECH_THRESHOLD)
+    return float((voiced[-1] + 1 - voiced[0]) * _FRAME / 16000) if len(voiced) else 0.0
+
+
 def preemphasis(audio: np.ndarray, alpha: float = PREEMPHASIS_ALPHA) -> np.ndarray:
     out = np.empty_like(audio)
     out[0] = audio[0]

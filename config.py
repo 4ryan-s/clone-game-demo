@@ -67,7 +67,14 @@ ENGINES = ["sarvam", "sarvam2", "qwen3tts"]
 MAX_ENGINES = 3
 
 # Settings for the second Sarvam clone ("sarvam2"). Form fields of POST /voices/clone, sent as text.
-SARVAM_VARIANT_PARAMS = {"remove_background_noise": "true", "enable_qc": "true", "pace": "0.95"}
+SARVAM_VARIANT_PARAMS = {"remove_background_noise": "true", "enable_qc": "true"}     # no fixed pace: both Sarvam clones are matched to the original's speed (below)
+
+# Sarvam speaks at its own pace. With SARVAM_MATCH_PACE the clone's speech length is compared with the original's (same words), and if it is off by more
+# than the tolerance the clone is made once more with a corrected `pace` (Sarvam accepts 0.5 to 2.0; the range below keeps it natural).
+SARVAM_MATCH_PACE = True
+SARVAM_PACE_TOLERANCE = 0.07
+SARVAM_PACE_MIN = 0.7
+SARVAM_PACE_MAX = 1.7
 
 # Names shown on the reveal screen, after the participant has picked.
 ENGINE_LABELS = {"sarvam": "Sarvam", "sarvam2": "Sarvam (other settings)", "qwen3tts": "Qwen3-TTS"}

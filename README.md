@@ -113,6 +113,12 @@ Cards = 1 real + one per engine. Three engines (Sarvam, Sarvam with other settin
 - The browser only sees neutral slot ids (`c1`, `c2`). Which engine made which clip is in `meta.json` and is not sent before the pick.
 - Placeholders to settle: the final sentence (`config.SENTENCE`), the contact for deletion (`config.CONTACT`), and sign-off on `consent.py`.
 
+## Sarvam clones: speed and accent
+
+**Speed.** Sarvam speaks at its own pace and adds pauses at punctuation, so on a fast or clipped speaker its clone can be much slower. On a 13.1 s test recording the first Sarvam clone lasted 21.1 s (61% slower). The engine now compares how long the clone's speech lasts with the original's (the clone says the same words, thanks to speech to text), and if it is off by more than `SARVAM_PACE_TOLERANCE` (7%) it asks Sarvam again with a corrected `pace` (Sarvam accepts 0.5 to 2.0; limited here to 0.7 to 1.7). Result on that recording: pace 1.6 gave 13.4 s (+2%), and the second Sarvam clone, pace 1.49, gave 13.8 s (+5%). It costs one extra Sarvam call, about 2 s, and only when the clone is off. Where the first clone was already close (an 18-word sentence: 10.0 s against 9.6 s) nothing changes. Both Sarvam clones are matched, so the second one no longer has the fixed 0.95 pace. Sarvam's `max_audio_duration` setting did nothing in a test. Switch off with `SARVAM_MATCH_PACE = False`. Check: `python tests/sarvam_pace_live.py <reference.wav> "<its exact words>"`.
+
+**Accent.** Sarvam's only English voice setting is `en-IN` (Indian English), and leaving the language out gives the same result (speaker similarity 0.82 to 0.87 either way, so likeness is fine). The accent comes from Sarvam's model and no setting here changes it, so a speaker with another accent will hear it in the Sarvam cards. Qwen3-TTS copies the accent of the reference audio instead.
+
 ## Qwen3-TTS run-on tail
 
 Qwen3-TTS often does not stop at the end of the sentence. It keeps generating until it hits its token cap and fills the rest with loud, tonal noise (about 7 dB under the speech level), so a clip could carry 4 to 5 seconds of noise and dead space after the words. In one test with the same reference and text, default sampling ran on in 1 of 4 samples, temperature 0.7 in 2 of 4 and temperature 0.5 in 4 of 4, so lowering the temperature makes it worse and the settings are left at the model's defaults.

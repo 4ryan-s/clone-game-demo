@@ -10,7 +10,9 @@ from pathlib import Path
 
 import requests
 
+import audio
 import config
+import spectra_prep
 from .base import Engine, EngineError
 
 
@@ -33,10 +35,8 @@ class Sarvam(Engine):
     def available(self):
         return (True, "") if _key() else (False, "SARVAM_API_KEY is not set")
 
-    def clone(self, ref_wav: Path, ref_text: str, text: str, out_wav: Path) -> dict:
-        key = _key()
-        if not key:
-            raise EngineError("SARVAM_API_KEY is not set")
+    def _request(self, key: str, ref_wav: Path, ref_text: str, text: str, extra: dict) -> bytes:
+        """One call to /voices/clone. Returns the WAV bytes."""
         r = None
         for attempt in range(3):                       # Sarvam answers 429 (rate limit) when many people clone at once: wait a little and retry
             try:
@@ -44,7 +44,7 @@ class Sarvam(Engine):
                     r = requests.post(
                         "https://api.sarvam.ai/voices/clone", headers={"api-subscription-key": key},
                         files={"ref_audio": ("ref.wav", fh, "audio/wav")},
-                        data={"text": text, "language_code": "en-IN", "ref_text": ref_text, **self.params},
+                        data={"text": text, "language_code": "en-IN", "ref_text": ref_text, **extra},
                         timeout=config.SARVAM_TIMEOUT_S)
             except requests.RequestException as exc:
                 if attempt == 2:
@@ -58,9 +58,43 @@ class Sarvam(Engine):
             break
         if r.status_code != 200:
             raise EngineError(f"Sarvam HTTP {r.status_code}: {r.text[:200].replace(key, '<key>')}")
+        return base64.b64decode(r.json()["audio"])
+
+    @staticmethod
+    def _span(wav_bytes: bytes) -> float:
+        x, sr = audio.read_wav_bytes(wav_bytes)
+        return spectra_prep.speech_span(audio.to_16k(x, sr))
+
+    def clone(self, ref_wav: Path, ref_text: str, text: str, out_wav: Path) -> dict:
+        key = _key()
+        if not key:
+            raise EngineError("SARVAM_API_KEY is not set")
+        pace = float(self.params.get("pace", 1.0))
+        data = self._request(key, ref_wav, ref_text, text, self.params)
+        info = {"service": "sarvam", "params": dict(self.params), "pace": pace}
+        # Match the speed of the original. Sarvam speaks at its own pace (slower than a fast speaker, and it adds pauses at punctuation), so
+        # compare how long the clone's speech lasts with the original's. That only means something when both say the same words, which is the
+        # case when the text is the transcript of the reference. If it is off by more than the tolerance, ask once more with a corrected pace.
+        if config.SARVAM_MATCH_PACE and ref_text.strip().lower() == text.strip().lower():
+            try:
+                x, sr = audio.read_wav_bytes(Path(ref_wav).read_bytes())
+                target = spectra_prep.speech_span(audio.to_16k(x, sr))
+                got = self._span(data)
+                ratio = got / target if target > 0 and got > 0 else 1.0
+                info.update(target_s=round(target, 2), first_s=round(got, 2))
+                if abs(ratio - 1.0) > config.SARVAM_PACE_TOLERANCE:
+                    new_pace = min(config.SARVAM_PACE_MAX, max(config.SARVAM_PACE_MIN, pace * ratio))
+                    if abs(new_pace - pace) > 0.02:
+                        again = self._request(key, ref_wav, ref_text, text, {**self.params, "pace": f"{new_pace:.2f}"})
+                        got2 = self._span(again)
+                        if abs(got2 / target - 1.0) < abs(ratio - 1.0):          # keep whichever is closer to the original's speed
+                            data, pace = again, new_pace
+                            info.update(pace=round(pace, 2), matched_s=round(got2, 2))
+            except Exception as exc:  # noqa: BLE001   (matching is an extra: never lose the clone because it failed)
+                info["pace_match_error"] = f"{type(exc).__name__}: {str(exc)[:100]}"
         out_wav.parent.mkdir(parents=True, exist_ok=True)
-        out_wav.write_bytes(base64.b64decode(r.json()["audio"]))
-        return {"service": "sarvam", "params": dict(self.params)}
+        out_wav.write_bytes(data)
+        return info
 
 
 class SarvamVariant(Sarvam):
