@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { Button, ErrorNote } from "./ui";
 import { VoiceCard } from "./VoiceCard";
-import { CertificateCard } from "./CertificateCard";
+import { ShareCard } from "./ShareCard";
 import { Confetti } from "./Confetti";
 import { cx } from "../lib/cx";
 
 export function ResultStep({ result, cardIds, sid, retain, onFinish }) {
   const won = result.won;
   const [showScores, setShowScores] = useState(false);
-  const [showCert, setShowCert] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [active, setActive] = useState(null);
   const [closing, setClosing] = useState("");
   const [error, setError] = useState("");
@@ -19,6 +19,7 @@ export function ResultStep({ result, cardIds, sid, retain, onFinish }) {
     })
     .filter(Boolean);
   const real = ordered.find((card) => card.real);
+  const cloneCount = ordered.filter((card) => !card.real).length;
   const shown = ordered;
 
   useEffect(() => {
@@ -86,10 +87,12 @@ export function ResultStep({ result, cardIds, sid, retain, onFinish }) {
       </div>
 
       <footer className="flex flex-col items-center gap-4 pt-1">
-        {won && !showCert && (
-          <Button primary className="w-full max-w-xs" onClick={() => setShowCert(true)}>View certificate</Button>
+        {won && !showShare && (
+          <Button primary className="w-full max-w-xs" onClick={() => setShowShare(true)}>Share</Button>
         )}
-        {won && showCert && <CertificateCard sid={sid} />}
+        {won && showShare && (
+          <ShareCard sid={sid} cloneCount={cloneCount} audioUrl={real ? `/api/sessions/${sid}/cards/${real.card}.wav` : ""} />
+        )}
         {won && retain && (
           <p className="max-w-md text-center text-sm text-muted">
             Thank you for agreeing to let us save your voice to train future models!
