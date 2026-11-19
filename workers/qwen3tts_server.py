@@ -17,6 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import config  # noqa: E402
+import tailtrim  # noqa: E402
 from workers.batcher import Batcher  # noqa: E402
 
 os.environ.setdefault("HF_HOME", str(config.HF_HOME))
@@ -75,27 +76,55 @@ def token_budget(text: str) -> int:
     return int(12 * seconds)
 
 
-def run_batch(jobs: list[dict]) -> list:
-    """Generate all jobs with one model call. Returns one result dict (or Exception) per job, in order. Runs on the batching thread only."""
+TOKENS_PER_SECOND = 12.5      # the 12 Hz speech codec: the clip length at the token cap is max_new_tokens / 12.5
+
+
+def generate(jobs: list[dict], budget: int):
+    """One model call for these jobs. Returns (list of float32 numpy clips, sample rate)."""
     n = len(jobs)
-    t0 = time.time()
-    budget = max(token_budget(j["text"]) for j in jobs)          # a clip that ends sooner simply stops earlier
     if n == 1:
         j = jobs[0]
         wavs, sr = MODEL.generate_voice_clone(text=j["text"], language="English", ref_audio=j["ref"], ref_text=j["ref_text"], max_new_tokens=budget)
     else:
         wavs, sr = MODEL.generate_voice_clone(text=[j["text"] for j in jobs], language=["English"] * n, ref_audio=[j["ref"] for j in jobs],
                                               ref_text=[j["ref_text"] for j in jobs], max_new_tokens=budget)
+    return list(wavs), sr
+
+
+def run_batch(jobs: list[dict]) -> list:
+    """Generate all jobs with one model call. Returns one result dict (or Exception) per job, in order. Runs on the batching thread only.
+
+    The model often does not stop at the end of the sentence and fills the rest of its token budget with loud noise, so every clip
+    is cut just after the last speech (tailtrim.py). A clip still speaking at the cap is generated once more."""
+    n = len(jobs)
+    t0 = time.time()
+    budget = max(token_budget(j["text"]) for j in jobs)          # a clip that ends sooner simply stops earlier
+    cap_s = budget / TOKENS_PER_SECOND
+    wavs, sr = generate(jobs, budget)
+    trimmed = [tailtrim.trim_tail(w, sr, cap_s=cap_s) for w in wavs]
+    retried = set()
+    bad = [i for i, (_x, info) in enumerate(trimmed) if info["ran_on"]]
+    if bad:
+        print(f"{len(bad)} clip(s) still speaking at the cap: generating them again", flush=True)
+        again, _ = generate([jobs[i] for i in bad], budget)
+        for i, w in zip(bad, again):
+            retried.add(i)
+            second = tailtrim.trim_tail(w, sr, cap_s=cap_s)
+            if not second[1]["ran_on"] or second[1]["speech_end"] < trimmed[i][1]["speech_end"]:
+                trimmed[i] = second                                 # the new take ended properly (or at least earlier)
     seconds = round(time.time() - t0, 2)
     results = []
-    for j, w in zip(jobs, wavs):
+    for i, (j, (clip, info)) in enumerate(zip(jobs, trimmed)):
         try:
             os.makedirs(os.path.dirname(j["out"]), exist_ok=True)
-            sf.write(j["out"], w, sr)
-            results.append({"ok": True, "seconds": seconds, "sample_rate": sr, "batch_size": n})
+            sf.write(j["out"], clip, sr)
+            results.append({"ok": True, "seconds": seconds, "sample_rate": sr, "batch_size": n, "tail_trimmed_s": info["trimmed_s"],
+                            "retried": i in retried, "ran_on": info["ran_on"]})
         except Exception as exc:  # noqa: BLE001
             results.append(exc)
-    print(f"batch of {n}: {seconds:.1f}s ({', '.join(f'{len(w) / sr:.1f}s' for w in wavs)} of audio)", flush=True)
+    ends = ", ".join("%.1fs" % info["speech_end"] for _c, info in trimmed)
+    cuts = ", ".join("%.1fs" % info["trimmed_s"] for _c, info in trimmed)
+    print(f"batch of {n}: {seconds:.1f}s; speech ends at {ends}; tails cut: {cuts}", flush=True)
     return results
 
 

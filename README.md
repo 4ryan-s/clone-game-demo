@@ -113,6 +113,12 @@ Cards = 1 real + one per engine. Three engines (Sarvam, Sarvam with other settin
 - The browser only sees neutral slot ids (`c1`, `c2`). Which engine made which clip is in `meta.json` and is not sent before the pick.
 - Placeholders to settle: the final sentence (`config.SENTENCE`), the contact for deletion (`config.CONTACT`), and sign-off on `consent.py`.
 
+## Qwen3-TTS run-on tail
+
+Qwen3-TTS often does not stop at the end of the sentence. It keeps generating until it hits its token cap and fills the rest with loud, tonal noise (about 7 dB under the speech level), so a clip could carry 4 to 5 seconds of noise and dead space after the words. In one test with the same reference and text, default sampling ran on in 1 of 4 samples, temperature 0.7 in 2 of 4 and temperature 0.5 in 4 of 4, so lowering the temperature makes it worse and the settings are left at the model's defaults.
+
+The worker now cuts every clip 0.3 s after the last speech (`tailtrim.py`, using the Silero speech detector), with a 20 ms fade. A clip that is still speaking when it reaches the cap (rambling or cut off) is generated once more. Checked on the failing case: of 8 samples, 2 had a 4.2 s and a 5.2 s tail, both were cut, and every clip ended within 0.3 s of its last word with the words intact. The worker's result says how much was cut (`tail_trimmed_s`, `retried`, `ran_on`). Check: `python tests/test_tailtrim.py <speech.wav>`.
+
 ## Speech to text on the recording
 
 When the recording passes the audio quality check it is sent to Sarvam speech to text (`stt.py`, model `saaras:v4`, `verbatim` mode, about 1 s). The words it hears are used three ways:
