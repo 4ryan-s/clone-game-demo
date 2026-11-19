@@ -47,11 +47,11 @@ export default function App() {
     init();
   }
 
-  async function agree({ retain: keep }) {
+  async function agree({ retain: keep, cloning }) {
     const created = await api("/api/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agree: true, retain: keep, version: cfg.consent.version }),
+      body: JSON.stringify({ agree: cloning, cloning, retain: keep, version: cfg.consent.version }),
     });
     setRetain(keep);
     setSid(created.session_id);

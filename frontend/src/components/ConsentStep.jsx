@@ -6,6 +6,7 @@ import { cx } from "../lib/cx";
 const EMPTY_STATS = { guests: 0, identified: 0, missed: 0, voices: 0, recorded: 0, saved: 0 };
 
 export function ConsentStep({ consent, onAgree }) {
+  const [cloning, setCloning] = useState(false);
   const [retain, setRetain] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -23,7 +24,7 @@ export function ConsentStep({ consent, onAgree }) {
     setBusy(true);
     setError("");
     try {
-      await onAgree({ retain });
+      await onAgree({ retain, cloning });
     } catch (err) {
       setError(err.message);
       setBusy(false);
@@ -36,6 +37,19 @@ export function ConsentStep({ consent, onAgree }) {
       <Scoreboard stats={stats} />
       <div className="mt-4 rounded-[28px] border border-line bg-card p-5 shadow-[0_24px_50px_-36px_rgba(40,30,10,0.55)] sm:mt-5 sm:p-6">
           <label className="flex cursor-pointer gap-3 rounded-2xl border border-line bg-paper/60 p-4 transition hover:border-accent/40">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-5 w-5 shrink-0 accent-[#0f6f5b]"
+              checked={cloning}
+              onChange={(event) => setCloning(event.target.checked)}
+            />
+            <span className="text-[15px] leading-relaxed">
+              <span className="mr-2 inline-block rounded-full bg-bad/10 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-bad align-middle">Required</span>
+              {consent.cloning.label}
+            </span>
+          </label>
+
+          <label className="mt-3 flex cursor-pointer gap-3 rounded-2xl border border-line bg-paper/60 p-4 transition hover:border-accent/40">
             <input
               type="checkbox"
               className="mt-0.5 h-5 w-5 shrink-0 accent-[#0f6f5b]"
@@ -54,9 +68,12 @@ export function ConsentStep({ consent, onAgree }) {
             </div>
           ) : null}
 
-          <Button primary className="mt-6 w-full" disabled={busy} onClick={submit}>
+          <Button primary className="mt-6 w-full" disabled={busy || !cloning} onClick={submit}>
             {busy ? "Starting…" : "Start"}
           </Button>
+          {!cloning && (
+            <p className="mt-2 text-center text-xs text-muted">Tick the required box above to begin.</p>
+          )}
       </div>
     </div>
   );

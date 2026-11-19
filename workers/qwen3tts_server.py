@@ -14,7 +14,6 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from socketserver import ThreadingMixIn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import config  # noqa: E402
@@ -165,26 +164,10 @@ class Handler(BaseHTTPRequestHandler):
             result = BATCHER.submit({k: job[k] for k in ("ref", "ref_text", "text", "out")})
             self._send(200, result)
         except Exception as exc:  # noqa: BLE001
-            return self._send(400, {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:200]}"})
-        with _CLONE_LOCK:
-            try:
-                t = time.time()
-                wavs, sr = MODEL.generate_voice_clone(text=job["text"], language="English", ref_audio=job["ref"],
-                                                      ref_text=job["ref_text"], max_new_tokens=token_budget(job["text"]))
-                os.makedirs(os.path.dirname(job["out"]), exist_ok=True)
-                sf.write(job["out"], wavs[0], sr)
-                self._send(200, {"ok": True, "seconds": round(time.time() - t, 2), "sample_rate": sr})
-                print(f"clone done in {time.time() - t:.1f}s ({len(wavs[0]) / sr:.1f}s of audio)", flush=True)
-            except Exception as exc:  # noqa: BLE001
-                print("clone failed:", type(exc).__name__, str(exc)[:200], flush=True)
-                self._send(500, {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:200]}"})
+            return self._send(500, {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:200]}"})
 
     def log_message(self, *args):
         pass
-
-
-class Server(ThreadingMixIn, HTTPServer):
-    daemon_threads = True
 
 
 Server((os.environ.get("QWEN_HOST", "127.0.0.1"), PORT), Handler).serve_forever()
