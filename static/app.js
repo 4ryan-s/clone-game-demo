@@ -310,7 +310,7 @@ function showResult(res) {
       <div class="score"><div class="num"></div><div class="call"></div>
         <div class="gauge" style="--cut:${pos(res.cutoff)}"><span class="cutmark"></span><span class="dot2" style="left:${pos(c.margin)}"></span></div>
         <div class="scale"><span>clone</span><span>real</span></div></div>`);
-    el.querySelector(".tag").textContent = c.real ? "Your real voice" : `Clone: ${c.who}`;
+    el.querySelector(".tag").textContent = c.real ? "Your real voice" : "Cloned voice";
     el.querySelector(".picked").textContent = you;
     el.querySelector(".num").textContent = (c.margin > 0 ? "+" : "") + c.margin.toFixed(1);
     el.querySelector(".call").textContent = c.says_clone ? "Called a clone" : "Passed as real";

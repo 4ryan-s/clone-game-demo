@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { QRCodeCanvas } from "qrcode.react";
 import { Button, ErrorNote } from "./ui";
 import { api } from "../lib/api";
 import { buildCertificate } from "../lib/certificate";
@@ -19,7 +18,6 @@ function triggerDownload(blob) {
 
 export function CertificateCard({ sid }) {
   const [preview, setPreview] = useState("");
-  const [certUrl, setCertUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
@@ -31,18 +29,21 @@ export function CertificateCard({ sid }) {
     startedRef.current = true;
     (async () => {
       try {
+        let spottedRate;
+        try {
+          const stats = await api("/api/stats");
+          const guests = stats.guests || 0;
+          if (guests > 0) spottedRate = Math.round(((stats.identified || 0) / guests) * 100);
+        } catch {
+          spottedRate = undefined;
+        }
         const { blob, dataUrl } = await buildCertificate({
           date: new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }),
           code: sid,
+          spottedRate,
         });
         blobRef.current = blob;
         setPreview(dataUrl);
-        const res = await api(`/api/sessions/${sid}/certificate`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: dataUrl, won: true }),
-        });
-        setCertUrl(new URL(res.url, window.location.origin).href);
       } catch (err) {
         setError(err.message || "The certificate could not be created.");
       } finally {
@@ -79,21 +80,6 @@ export function CertificateCard({ sid }) {
         <p className="mt-3 text-sm text-muted">Preparing your certificate…</p>
       ) : (
         <>
-          {certUrl && (
-            <>
-              <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
-                <strong className="text-ink">Scan with your phone camera</strong> to save and share it.
-                Collect your goodie from the booth by showing it.
-              </p>
-              <div className="mt-5 flex justify-center">
-                <div className="rounded-2xl border border-line bg-white p-4">
-                  <QRCodeCanvas value={certUrl} size={200} includeMargin level="M" fgColor="#1c1915" />
-                </div>
-              </div>
-              <p className="mt-3 break-all text-xs text-muted">{certUrl}</p>
-            </>
-          )}
-
           {preview && (
             <img
               src={preview}
