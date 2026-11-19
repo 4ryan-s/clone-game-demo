@@ -21,12 +21,12 @@ services:
       QWEN_HOST: 0.0.0.0
       QWEN_PORT: "8766"
       HF_HOME: /app/models/hf
-      # Default is ONE worker (the qwen2 service is off unless COMPOSE_PROFILES=two-workers). See .env.example for both presets.
-      QWEN_MAX_BATCH: ${QWEN_MAX_BATCH:-4}
+      # Default is ONE worker with a batch of 6 (measured best on a 16 GB T4; two workers were slower). qwen2 is off unless COMPOSE_PROFILES=two-workers.
+      QWEN_MAX_BATCH: ${QWEN_MAX_BATCH:-6}
       QWEN_BATCH_WINDOW_S: ${QWEN_BATCH_WINDOW_S:-1.0}
       PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
-      QWEN_BUDGET_REF_FACTOR: ${QWEN_BUDGET_REF_FACTOR:-0}
-      QWEN_GPU_MEM_FRACTION: ${QWEN_GPU_MEM_FRACTION:-0.6}
+      QWEN_BUDGET_REF_FACTOR: ${QWEN_BUDGET_REF_FACTOR:-1.3}
+      QWEN_GPU_MEM_FRACTION: ${QWEN_GPU_MEM_FRACTION:-0.75}
     volumes:
       - ./models:/app/models
       - ./data:/app/data
