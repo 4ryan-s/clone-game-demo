@@ -50,7 +50,8 @@ class Qwen3TTS(Engine):
         out_wav.parent.mkdir(parents=True, exist_ok=True)
         # The audio goes in the request and comes back in the reply, so a worker can run on any machine (no shared disk needed).
         tag = out_wav.parent.parent.name              # sessions/<session id>/raw/<engine>.wav: the session id ties client and worker log lines together
-        payload = {"ref_b64": base64.b64encode(Path(ref_wav).read_bytes()).decode(), "ref_text": ref_text, "text": text, "tag": tag}
+        payload = {"ref_b64": base64.b64encode(Path(ref_wav).read_bytes()).decode(), "ref_text": ref_text, "text": text,
+                   "language": config.QWEN_LANGUAGE, "tag": tag}
         headers = {"X-Qwen-Token": config.QWEN_TOKEN} if config.QWEN_TOKEN else {}
         last = "no worker configured"
         t0 = time.time()

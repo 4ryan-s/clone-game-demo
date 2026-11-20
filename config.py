@@ -89,6 +89,20 @@ SARVAM_PACE_TOLERANCE = 0.07
 SARVAM_PACE_MIN = 0.7
 SARVAM_PACE_MAX = 1.7
 
+# Speed of every clone (pace.py). After an engine returns, a clone whose speech lasts more than PACE_TOLERANCE longer or shorter than the
+# participant's own (same words) is time-stretched to match, keeping the pitch. Qwen3-TTS has no speed setting and runs 5-25 % fast; Sarvam is
+# already matched in its engine, this only catches what is left. A stretch is limited to PACE_STRETCH_LIMITS (bigger ones are audible), and a clone
+# more than 2x or less than half the target is left alone (a run-on or cut-off clone: stretching would not fix it).
+# CLONE_SLOWDOWN above 1.0 makes every clone a little slower than the person (1.05 = 5 % slower).
+PACE_TOLERANCE = 0.05
+PACE_STRETCH_LIMITS = (0.8, 1.25)
+CLONE_SLOWDOWN = 1.0
+
+# Room noise (roomnoise.py), playback only. The clone check always scores the clean clone; the clip people listen to gets noise shaped like the
+# quiet parts of their own recording, at the same signal-to-noise ratio (kept inside this range), so the clone does not give itself away by being clean.
+PLAYBACK_ROOM_NOISE = True
+ROOM_NOISE_SNR_RANGE = (10.0, 45.0)
+
 # Names shown on the reveal screen, after the participant has picked.
 ENGINE_LABELS = {"sarvam": "Sarvam", "sarvam2": "Sarvam (other settings)", "qwen3tts": "Qwen3-TTS"}
 
@@ -107,7 +121,8 @@ QWEN_URLS = [u.strip().rstrip("/") for u in os.environ.get("QWEN_URLS", QWEN_URL
 QWEN_TOKEN = os.environ.get("QWEN_TOKEN", "")      # shared secret between the api and the workers (header X-Qwen-Token). Set it whenever a worker runs on another machine
 QWEN_PYTHON = venv_python("qwen")
 QWEN_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"        # Hugging Face id, downloaded into MODELS_DIR/hf by setup.py
-QWEN_TIMEOUT_S = 240       # one clip takes 15-50 s; a request that just missed a batch waits for that batch and then runs in the next one
+QWEN_LANGUAGE = "Auto"     # the language tag given to Qwen3-TTS with the text: "Auto" lets the model take it from the reference; "English" forces English (see README: Auto misread fewer words in a 6-recording test)
+QWEN_TIMEOUT_S = 240      # one clip takes 15-50 s; a request that just missed a batch waits for that batch and then runs in the next one
 
 HF_HOME = MODELS_DIR / "hf"
 SARVAM_TIMEOUT_S = 90

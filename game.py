@@ -4,6 +4,7 @@ import io
 import logging
 import secrets
 import random
+import zlib
 import time
 
 import numpy as np
@@ -11,9 +12,14 @@ import soundfile as sf
 
 import audio
 import config
+import roomnoise
 import scoring
+import spectra_prep
 import stats
 import store
+
+log = logging.getLogger("game")
+
 
 log = logging.getLogger("game")
 
@@ -45,17 +51,46 @@ def find_card(sid: str, card_id: str) -> dict | None:
     return None
 
 
-def playback_wav(sid: str, card: dict) -> bytes:
-    """What the participant hears: same format, same loudness, same lead and tail silence for every card."""
-    x, sr = sf.read(str(_clip_path(sid, card)), dtype="float32")
-    x = audio.to_16k(x if x.ndim == 1 else x.mean(axis=1), sr)
-    frame = 320                                                  # 20 ms
-    n = len(x) // frame
-    if n > 4:
+def _read16k(path) -> np.ndarray:
+    x, sr = sf.read(str(path), dtype="float32")
+    return audio.to_16k(x if x.ndim == 1 else x.mean(axis=1), sr)
+
+
+def _trim_to_speech(x: np.ndarray) -> np.ndarray:
+    """Cut every card to the same lead and tail (config.PLAY_PAD_SECONDS) around the speech. The speech detector decides where the speech is, so a
+    recording with room noise is cut the same way as a clean clone (a level threshold would keep the noisy one's whole lead-in)."""
+    pad = int(config.PLAY_PAD_SECONDS * audio.SR)
+    try:
+        voiced = np.flatnonzero(spectra_prep.speech_probs(x) >= 0.5)
+    except Exception:  # noqa: BLE001
+        voiced = []
+    if len(voiced):
+        start, end = voiced[0] * 512, (voiced[-1] + 1) * 512
+    else:
+        frame = 320                                              # no speech found: fall back to the 20 ms level threshold
+        n = len(x) // frame
+        if n <= 4:
+            return x
         env = np.sqrt(np.mean(x[: n * frame].reshape(n, frame) ** 2, axis=1))
         live = np.flatnonzero(env > 0.05 * env.max())
-        pad = int(config.PLAY_PAD_SECONDS * audio.SR)
-        x = x[max(0, live[0] * frame - pad): min(len(x), (live[-1] + 1) * frame + pad)]
+        start, end = live[0] * frame, (live[-1] + 1) * frame
+    out = x[max(0, start - pad): min(len(x), end + pad)]
+    lead, tail = max(0, pad - start), max(0, end + pad - len(x))   # a clone that starts or ends right on the speech gets silence, so every card has the same lead and tail
+    return np.concatenate([np.zeros(lead, np.float32), out, np.zeros(tail, np.float32)]) if lead or tail else out
+
+
+def playback_wav(sid: str, card: dict) -> bytes:
+    """What the participant hears: same format, same loudness, same lead and tail silence for every card."""
+    x = _read16k(_clip_path(sid, card))
+    x = _trim_to_speech(x)
+    if card["kind"] != "real" and config.PLAYBACK_ROOM_NOISE:
+        # The clone check scores the clean clone (see reveal). Only what people listen to gets the room of their own recording, so the
+        # clones do not give themselves away by being studio-clean next to a recording with room noise in it.
+        try:
+            room = roomnoise.measure(_read16k(_clip_path(sid, {"kind": "real"})))
+            x = roomnoise.add_to(x, room, seed=zlib.crc32(card["id"].encode()))
+        except Exception as exc:  # noqa: BLE001   (an extra: the clean clone still plays if it fails)
+            log.warning("room noise skipped for %s: %s", sid, exc)
     rms = float(np.sqrt(np.mean(x ** 2))) + 1e-9
     gain = 10 ** (config.PLAY_TARGET_RMS_DBFS / 20) / rms
     peak = float(np.max(np.abs(x))) + 1e-9

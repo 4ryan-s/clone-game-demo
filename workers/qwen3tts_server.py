@@ -134,9 +134,9 @@ def _generate(jobs: list[dict], budget: int):
     n = len(jobs)
     if n == 1:
         j = jobs[0]
-        wavs, sr = MODEL.generate_voice_clone(text=j["text"], language="English", ref_audio=j["ref"], ref_text=j["ref_text"], max_new_tokens=budget)
+        wavs, sr = MODEL.generate_voice_clone(text=j["text"], language=j["language"], ref_audio=j["ref"], ref_text=j["ref_text"], max_new_tokens=budget)
     else:
-        wavs, sr = MODEL.generate_voice_clone(text=[j["text"] for j in jobs], language=["English"] * n, ref_audio=[j["ref"] for j in jobs],
+        wavs, sr = MODEL.generate_voice_clone(text=[j["text"] for j in jobs], language=[j["language"] for j in jobs], ref_audio=[j["ref"] for j in jobs],
                                               ref_text=[j["ref_text"] for j in jobs], max_new_tokens=budget)
     return list(wavs), sr
 
@@ -243,11 +243,13 @@ class Handler(BaseHTTPRequestHandler):
                 job = json.loads(self.rfile.read(length))
                 ref_b64 = job.get("ref_b64")
                 tag = re.sub(r"[^A-Za-z0-9_-]", "", str(job.get("tag", "")))[:16]
+                language = job.get("language") or config.QWEN_LANGUAGE
                 if ref_b64:
                     ref_bytes = base64.b64decode(ref_b64, validate=True)
-                    payload = {"ref_text": job["ref_text"], "text": job["text"], "tag": tag}
+                    payload = {"ref_text": job["ref_text"], "text": job["text"], "language": language, "tag": tag}
                 elif ALLOW_PATHS:
                     payload = {k: job[k] for k in ("ref", "ref_text", "text", "out")}
+                    payload["language"] = language
                 else:
                     raise ValueError("send the reference audio as ref_b64")
             except (ValueError, KeyError, TypeError, AttributeError) as exc:          # includes bad JSON and bad base64: the caller's mistake, not ours
