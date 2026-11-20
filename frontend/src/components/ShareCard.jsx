@@ -66,11 +66,21 @@ export function ShareCard({ sid, cloneCount, audioUrl }) {
       const blob = blobRef.current;
       if (!blob) return;
       const file = new File([blob], SHARE_FILE_NAME, { type: "image/png" });
-      const withCaption = { files: [file], text: SHARE_CAPTION };
-      if (navigator.canShare && navigator.canShare(withCaption)) {
-        await navigator.share(withCaption);
-      } else if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file] });
+      try {
+        await navigator.clipboard.writeText(SHARE_CAPTION);
+      } catch {
+        // the booth browser may block the clipboard; the share still goes out
+      }
+      const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const payload = ios ? { files: [file] } : { files: [file], text: SHARE_CAPTION, title: SHARE_CAPTION };
+      if (navigator.share) {
+        try {
+          await navigator.share(payload);
+        } catch (err) {
+          if (err && err.name === "AbortError") return;
+          await navigator.share({ files: [file] });
+        }
+        setNote("Caption copied. Paste it into Instagram if the caption box is empty.");
       } else {
         triggerDownload(blob);
         setNote("Sharing is not available here, so the image was saved. You can post it from your files.");

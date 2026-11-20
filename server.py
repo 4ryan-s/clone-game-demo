@@ -281,6 +281,7 @@ _SHARE_PAGE = """<!doctype html><html lang="en"><head>
   p { margin:0; color:#c8b8a4; text-align:center; }
   img { width:100%; max-width:520px; height:auto; border-radius:12px; }
   .row { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  .cap { color:#d8a94a; font-weight:700; font-size:18px; user-select:all; }
   a.btn, button.btn { appearance:none; cursor:pointer; text-decoration:none; font-size:16px; font-weight:600; padding:14px 26px; border-radius:999px; border:1px solid #d8a94a; }
   .primary { background:#d8a94a; color:#1a0a0d; }
   .ghost { background:transparent; color:#f3e9d8; }
@@ -288,6 +289,8 @@ _SHARE_PAGE = """<!doctype html><html lang="en"><head>
   <h1>Your image is ready</h1>
   __NOTE__
   <img src="__IMG__" alt="Your image to share">
+  <p class="cap" id="cap">#RCI26 #RCI @joshsoftware</p>
+  <p id="hint">Tap Share. WhatsApp receives this caption. If Instagram leaves it blank, paste it — Share copies it for you.</p>
   <div class="row">
     <button class="btn primary" id="share" type="button">Share</button>
     <a class="btn ghost" href="__IMG__" download="real-or-clone-share.png">Download</a>
@@ -296,14 +299,24 @@ _SHARE_PAGE = """<!doctype html><html lang="en"><head>
   var url = "__IMG__";
   var caption = "#RCI26 #RCI @joshsoftware";
   var ready = fetch(url).then(function (r) { return r.blob(); });
+  var ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
   document.getElementById("share").addEventListener("click", async function () {
+    var hint = document.getElementById("hint");
+    try { await navigator.clipboard.writeText(caption); } catch (e) {}
     try {
       var blob = await ready;
       var file = new File([blob], "real-or-clone-share.png", { type: "image/png" });
-      var withCaption = { files: [file], text: caption };
-      if (navigator.canShare && navigator.canShare(withCaption)) { await navigator.share(withCaption); }
-      else if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); }
-      else { window.location.href = url; }
+      // iPhone rejects an image and a caption in one share, and that rejection removes Instagram Stories.
+      // Android can carry the caption, so WhatsApp gets it. The caption is copied either way.
+      var payload = ios ? { files: [file] } : { files: [file], text: caption, title: caption };
+      if (navigator.share) {
+        try { await navigator.share(payload); }
+        catch (err) {
+          if (err && err.name === "AbortError") return;
+          await navigator.share({ files: [file] });
+        }
+      } else { window.location.href = url; }
+      hint.textContent = "Caption copied. Paste it into Instagram if the caption box is empty.";
     } catch (e) {}
   });
 </script></body></html>"""
