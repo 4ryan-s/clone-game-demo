@@ -87,8 +87,9 @@ class Batcher:
             no = self._batch_no
         start = time.monotonic()
         waits = [start - j.queued_at for j in batch]
-        log.info("batch #%d start: %d request(s) (%s, max %d), still queued %d, waited %s",
-                 no, len(batch), reason, self.max_batch, self._queue.qsize(), ", ".join("%.1fs" % w for w in waits))
+        log.info("batch #%d start: %d request(s) (%s, max %d), still queued %d, sessions %s, waited %s",
+                 no, len(batch), reason, self.max_batch, self._queue.qsize(), [j.payload.get("tag", "-") for j in batch],
+                 ", ".join("%.1fs" % w for w in waits))
         for j, w in zip(batch, waits):
             j.meta = {"batch_id": no, "queue_wait_s": round(w, 2), "batch_reason": reason}
         try:

@@ -81,10 +81,12 @@ class Sarvam(Engine):
             except requests.RequestException as exc:
                 if attempt == 2:
                     raise EngineError(f"Sarvam request failed ({type(exc).__name__})") from None
+                log.warning("Sarvam request failed (%s): retrying in %ds (attempt %d/3)", type(exc).__name__, 2 * (attempt + 1), attempt + 1)
                 time.sleep(2 * (attempt + 1))
                 continue
             if r.status_code == 429 or r.status_code >= 500:
                 if attempt < 2:
+                    log.warning("Sarvam answered HTTP %d: retrying in %ds (attempt %d/3)", r.status_code, 2 * (attempt + 1), attempt + 1)
                     time.sleep(2 * (attempt + 1))
                     continue
             break
@@ -126,6 +128,8 @@ class Sarvam(Engine):
                 info["pace_match_error"] = f"{type(exc).__name__}: {str(exc)[:100]}"
         out_wav.parent.mkdir(parents=True, exist_ok=True)
         out_wav.write_bytes(data)
+        log.info("[%s] %s: clone ready, pace %s (original speech %ss, first try %ss%s)", out_wav.parent.parent.name, self.name, info.get("pace"),
+                 info.get("target_s"), info.get("first_s"), f", after correction {info['matched_s']}s" if "matched_s" in info else "")
         return info
 
     def _post(self, ref_wav: Path, ref_text: str, text: str, key: str):
