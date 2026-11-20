@@ -32,6 +32,14 @@ _load_env()
 
 SESSIONS_DIR = ROOT / "data" / "sessions"                # working data of one play-through; deleted when it ends
 VOICE_SAMPLES_DIR = ROOT / "data" / "voice_samples"      # numbered recordings kept with consent (see voicebank.py); data/ is git-ignored
+
+# Share image on a phone: the Share card shows a QR code that opens /s/<token> with the picture (see shares.py).
+SHARES_DIR = ROOT / "data" / "shares"                    # git-ignored; no name or email is stored, only the picture and its session code
+SHARE_RETENTION_DAYS = 7                                 # share pictures are deleted after this many days (or at once on a deletion request)
+# A phone cannot open "localhost". On a kiosk set PUBLIC_BASE_URL to an address the phone can reach, for example http://192.168.1.20:8000
+# or the public HTTPS address; the QR code then points there. Without it the QR uses the address the page was opened from.
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+SHARE_BOOTH_NOTE = ""                                    # optional line on the phone page, for example about collecting a goodie. Empty = none.
 MODELS_DIR = ROOT / "models"       # downloaded by setup.py (not in git: several GB)
 VENVS_DIR = ROOT / ".venvs"        # one Python environment per local engine, created by setup.py
 
@@ -109,7 +117,7 @@ SARVAM_RETRY_BASE_S = 4.0     # wait before the single retry (unless the server 
 # Shown on the consent page as the person to contact to delete a recording. Leave empty to say "ask the demo host".
 CONTACT = ""
 
-CONSENT_VERSION = "draft-3"   # bump whenever the consent wording changes; stored with every session
+CONSENT_VERSION = "draft-4"   # bump whenever the consent wording changes; stored with every session
 
 try:                           # machine-specific overrides (paths to models and environments that already exist here)
     from local_config import *  # noqa: F401,F403

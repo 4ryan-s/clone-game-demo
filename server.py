@@ -6,6 +6,7 @@ session id) in data/voice_samples/ only if the participant ticked the optional b
 """
 import asyncio
 import base64
+import html
 import json
 import logging
 import os
@@ -15,7 +16,7 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -25,6 +26,7 @@ import engines
 import game
 import pipeline
 import scoring
+import shares
 import speech_check
 import stats
 import store
@@ -53,6 +55,9 @@ async def lifespan(_app):
     n = store.purge_stale()
     if n:
         log.info("removed %d unfinished working sessions older than 24 h", n)
+    m = shares.purge_old()
+    if m:
+        log.info("removed %d share images older than %s days", m, config.SHARE_RETENTION_DAYS)
     yield
 
 
@@ -207,10 +212,79 @@ def delete_session(sid: str):
         raise HTTPException(404, "Unknown session code")
     had_session = store.exists(sid)
     removed = voicebank.delete_for_session(sid)
-    if not had_session and not removed:
+    shared = shares.delete_for_session(sid)
+    if not had_session and not removed and not shared:
         raise HTTPException(404, "Unknown session code")
     store.delete(sid)
-    return {"deleted": True, "sample_deleted": bool(removed)}
+    return {"deleted": True, "sample_deleted": bool(removed), "share_deleted": bool(shared)}
+
+
+# ------------------------------------------------------------- share picture for a phone (QR code on the Share card)
+class ShareIn(BaseModel):
+    image: str = ""          # the finished share picture as a PNG data URL, drawn in the browser
+
+
+@app.post("/api/sessions/{sid}/share")
+def upload_share(sid: str, body: ShareIn):
+    """Keep the share picture for a few days and return the link the QR code points to. Nothing personal is stored."""
+    _need(sid)
+    shares.purge_old()
+    token = shares.save(sid, body.image)
+    if not token:
+        raise HTTPException(400, "The image was missing or not a valid PNG")
+    return {"ok": True, "token": token, "url": f"{config.PUBLIC_BASE_URL}/s/{token}" if config.PUBLIC_BASE_URL else f"/s/{token}"}
+
+
+@app.get("/api/shares/{token}.png")
+def share_image(token: str):
+    path = shares.image_path(token)
+    if not path:
+        raise HTTPException(404, "Not found")
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=3600", "X-Content-Type-Options": "nosniff"})
+
+
+_SHARE_PAGE = """<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real or Clone</title>
+<style>
+  body { margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:24px;
+         background:#1d0a0e; color:#f3e9d8; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  h1 { font-size:22px; margin:0; text-align:center; }
+  p { margin:0; color:#c8b8a4; text-align:center; }
+  img { width:100%; max-width:520px; height:auto; border-radius:12px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  a.btn, button.btn { appearance:none; cursor:pointer; text-decoration:none; font-size:16px; font-weight:600; padding:14px 26px; border-radius:999px; border:1px solid #d8a94a; }
+  .primary { background:#d8a94a; color:#1a0a0d; }
+  .ghost { background:transparent; color:#f3e9d8; }
+</style></head><body>
+  <h1>Your image is ready</h1>
+  __NOTE__
+  <img src="__IMG__" alt="Your image to share">
+  <div class="row">
+    <a class="btn primary" href="__IMG__" download="real-or-clone-share.png">Download</a>
+    <button class="btn ghost" id="share" type="button">Share</button>
+  </div>
+<script>
+  var url = "__IMG__";
+  document.getElementById("share").addEventListener("click", async function () {
+    try {
+      var blob = await (await fetch(url)).blob();
+      var file = new File([blob], "real-or-clone-share.png", { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "Real or Clone" }); }
+      else { window.location.href = url; }
+    } catch (e) {}
+  });
+</script></body></html>"""
+
+
+@app.get("/s/{token}", response_class=HTMLResponse)
+def share_page(token: str):
+    """The page the QR code opens on a phone: the picture with Download and Share buttons."""
+    if not shares.image_path(token):
+        raise HTTPException(404, "This image is no longer available")
+    note = f"<p>{html.escape(config.SHARE_BOOTH_NOTE)}</p>" if config.SHARE_BOOTH_NOTE else ""
+    page = _SHARE_PAGE.replace("__IMG__", f"/api/shares/{token}.png").replace("__NOTE__", note)
+    return HTMLResponse(page, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/stats")

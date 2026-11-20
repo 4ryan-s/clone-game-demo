@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { QRCodeCanvas } from "qrcode.react";
 import { Button, ErrorNote } from "./ui";
+import { api } from "../lib/api";
 import { buildShareImage } from "../lib/shareImage";
 import { fetchWaveform, seededWaveform } from "../lib/waveform";
 import { SHARE_FILE_NAME, SHARE_URL } from "../lib/shareConfig";
@@ -16,8 +18,10 @@ function triggerDownload(blob) {
 }
 
 // The picture the player posts. cloneCount: fake voices in the round. audioUrl: the player's own clip, drawn as the waveform.
+// The picture is also kept on the server for a few days so a phone can open it from the QR code (no name or email is collected).
 export function ShareCard({ sid, cloneCount, audioUrl }) {
   const [preview, setPreview] = useState("");
+  const [phoneUrl, setPhoneUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
@@ -38,6 +42,16 @@ export function ShareCard({ sid, cloneCount, audioUrl }) {
         const { blob, dataUrl } = await buildShareImage({ waveform, cloneCount, code: sid });
         blobRef.current = blob;
         setPreview(dataUrl);
+        try {
+          const res = await api(`/api/sessions/${sid}/share`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image: dataUrl }),
+          });
+          setPhoneUrl(new URL(res.url, window.location.origin).href);
+        } catch {
+          setNote("The phone link could not be made. You can still share or download the image here.");
+        }
       } catch (err) {
         setError(err.message || "The image could not be created.");
       } finally {
@@ -73,6 +87,18 @@ export function ShareCard({ sid, cloneCount, audioUrl }) {
         <p className="text-sm text-muted">Getting your image ready…</p>
       ) : (
         <>
+          {phoneUrl && (
+            <div className="mb-5">
+              <p className="mx-auto max-w-xs text-sm text-muted">
+                <strong className="text-ink">Scan with your phone camera</strong> to save and share your image.
+              </p>
+              <div className="mt-3 flex justify-center">
+                <div className="rounded-2xl border border-line bg-white p-3" data-testid="share-qr">
+                  <QRCodeCanvas value={phoneUrl} size={180} includeMargin level="M" fgColor="#1c1915" />
+                </div>
+              </div>
+            </div>
+          )}
           {preview && (
             <img
               src={preview}
