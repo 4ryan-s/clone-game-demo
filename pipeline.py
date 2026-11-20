@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 import audio
 import config
 import engines
+import pace
 import store
 from engines.base import EngineError
 
@@ -50,8 +51,15 @@ def _one(sid: str, eng, slot: str, text: str) -> None:
         x, sr = audio.read_wav_bytes(raw.read_bytes())
         raw.unlink(missing_ok=True)   # the engine's file is not kept; only the playback clip remains, and only until the session ends
         (d / "clones").mkdir(exist_ok=True)
-        audio.write_wav(d / "clones" / f"{slot}.wav", audio.to_16k(x, sr))
-        result = {"status": "done", "seconds": round(time.time() - t0, 2), "error": None, "source_sample_rate": sr, **(info or {})}
+        x16 = audio.to_16k(x, sr)
+        speed = {}
+        try:   # speak at the participant's speed (pace.py). An extra: never lose the clone because it failed.
+            ox, osr = audio.read_wav_bytes((d / "original.wav").read_bytes())
+            x16, speed = pace.match_speed(x16, audio.to_16k(ox, osr))
+        except Exception as exc:  # noqa: BLE001
+            speed = {"speed_error": f"{type(exc).__name__}: {str(exc)[:100]}"}
+        audio.write_wav(d / "clones" / f"{slot}.wav", x16)     # clean: this exact file is what the clone check scores
+        result = {"status": "done", "seconds": round(time.time() - t0, 2), "error": None, "source_sample_rate": sr, **(info or {}), **speed}
     except Exception as exc:  # noqa: BLE001
         log.warning("engine %s failed for %s: %s", eng.name, sid, exc)
         result = {"status": "error", "seconds": round(time.time() - t0, 2), "error": f"{type(exc).__name__}: {str(exc)[:200]}"}

@@ -86,9 +86,9 @@ def generate(jobs: list[dict], budget: int):
     n = len(jobs)
     if n == 1:
         j = jobs[0]
-        wavs, sr = MODEL.generate_voice_clone(text=j["text"], language="English", ref_audio=j["ref"], ref_text=j["ref_text"], max_new_tokens=budget)
+        wavs, sr = MODEL.generate_voice_clone(text=j["text"], language=j["language"], ref_audio=j["ref"], ref_text=j["ref_text"], max_new_tokens=budget)
     else:
-        wavs, sr = MODEL.generate_voice_clone(text=[j["text"] for j in jobs], language=["English"] * n, ref_audio=[j["ref"] for j in jobs],
+        wavs, sr = MODEL.generate_voice_clone(text=[j["text"] for j in jobs], language=[j["language"] for j in jobs], ref_audio=[j["ref"] for j in jobs],
                                               ref_text=[j["ref_text"] for j in jobs], max_new_tokens=budget)
     return list(wavs), sr
 
@@ -161,7 +161,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(503, {"ok": False, "error": LOAD_ERROR or "still loading"})
         try:
             job = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
-            result = BATCHER.submit({k: job[k] for k in ("ref", "ref_text", "text", "out")})
+            result = BATCHER.submit({**{k: job[k] for k in ("ref", "ref_text", "text", "out")}, "language": job.get("language") or config.QWEN_LANGUAGE})
             self._send(200, result)
         except Exception as exc:  # noqa: BLE001
             return self._send(500, {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:200]}"})

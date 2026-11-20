@@ -21,7 +21,8 @@ class Qwen3TTS(Engine):
         out_wav.parent.mkdir(parents=True, exist_ok=True)
         try:
             r = requests.post(config.QWEN_URL + "/clone", timeout=config.QWEN_TIMEOUT_S, json={
-                "ref": ref_wav.resolve().as_posix(), "ref_text": ref_text, "text": text, "out": out_wav.resolve().as_posix()})
+                "ref": ref_wav.resolve().as_posix(), "ref_text": ref_text, "text": text, "out": out_wav.resolve().as_posix(),
+                "language": config.QWEN_LANGUAGE})
         except requests.RequestException as exc:
             raise EngineError(f"Qwen3-TTS worker unreachable ({type(exc).__name__})") from None
         if r.status_code != 200 or not r.json().get("ok"):
