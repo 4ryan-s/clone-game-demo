@@ -281,18 +281,19 @@ _SHARE_PAGE = """<!doctype html><html lang="en"><head>
   p { margin:0; color:#c8b8a4; text-align:center; }
   img { width:100%; max-width:520px; height:auto; border-radius:12px; }
   .row { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
-  .cap { color:#d8a94a; font-weight:700; font-size:18px; user-select:all; }
+  .capline { display:flex; align-items:baseline; justify-content:center; gap:8px; margin:0; white-space:nowrap; }
+  .cap { color:#d8a94a; font-weight:700; font-size:16px; }
+  .copytext { appearance:none; background:none; border:0; padding:0; margin:0; color:#d8a94a; font:inherit; font-weight:700; font-size:16px; line-height:1; text-decoration:underline; cursor:pointer; }
   a.btn, button.btn { appearance:none; cursor:pointer; text-decoration:none; font-size:16px; font-weight:600; padding:14px 26px; border-radius:999px; border:1px solid #d8a94a; }
-  .primary, .copied { background:#d8a94a; color:#1a0a0d; }
+  .primary { background:#d8a94a; color:#1a0a0d; }
   .ghost { background:transparent; color:#f3e9d8; }
 </style></head><body>
   <h1>Your image is ready</h1>
   __NOTE__
   <img src="__IMG__" alt="Your image to share">
-  <p class="cap" id="cap">#RCI26 #RCI @joshsoftware</p>
+  <p class="capline"><span class="cap">#RCI26 #RCI @joshsoftware</span> <button class="copytext" id="copy" type="button">Copy</button></p>
   <div class="row">
     <button class="btn primary" id="share" type="button">Share</button>
-    <button class="btn ghost" id="copy" type="button">Copy</button>
     <a class="btn ghost" href="__IMG__" download="real-or-clone-share.png">Download</a>
   </div>
 <script>
@@ -300,16 +301,8 @@ _SHARE_PAGE = """<!doctype html><html lang="en"><head>
   var caption = "#RCI26 #RCI @joshsoftware";
   var ready = fetch(url).then(function (r) { return r.blob(); });
   var ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  var copyTimer = 0;
   function markCopied() {
-    var btn = document.getElementById("copy");
-    btn.textContent = "Copied";
-    btn.className = "btn copied";
-    clearTimeout(copyTimer);
-    copyTimer = setTimeout(function () {
-      btn.textContent = "Copy";
-      btn.className = "btn ghost";
-    }, 2000);
+    document.getElementById("copy").textContent = "Copied";
   }
   async function copyCaption() {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -324,6 +317,7 @@ _SHARE_PAGE = """<!doctype html><html lang="en"><head>
     }
     markCopied();
   }
+  copyCaption().catch(function () {});
   document.getElementById("copy").addEventListener("click", function () {
     copyCaption().catch(function () {});
   });

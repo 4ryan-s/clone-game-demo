@@ -28,7 +28,6 @@ export function ShareCard({ sid, cloneCount, audioUrl }) {
   const [copied, setCopied] = useState(false);
   const blobRef = useRef(null);
   const startedRef = useRef(false);
-  const copiedTimer = useRef(0);
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -62,15 +61,9 @@ export function ShareCard({ sid, cloneCount, audioUrl }) {
     })();
   }, [sid, cloneCount, audioUrl]);
 
-  function markCopied() {
-    setCopied(true);
-    window.clearTimeout(copiedTimer.current);
-    copiedTimer.current = window.setTimeout(() => setCopied(false), 2000);
-  }
-
   async function copyCaption() {
     await navigator.clipboard.writeText(SHARE_CAPTION);
-    markCopied();
+    setCopied(true);
   }
 
   async function onShare() {
@@ -79,11 +72,10 @@ export function ShareCard({ sid, cloneCount, audioUrl }) {
       const blob = blobRef.current;
       if (!blob) return;
       try {
-        await copyCaption();
+        await navigator.clipboard.writeText(SHARE_CAPTION);
       } catch {
         // the booth browser may block the clipboard; the share still goes out
       }
-      await new Promise((resolve) => window.setTimeout(resolve, 700));
       const file = new File([blob], SHARE_FILE_NAME, { type: "image/png" });
       const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
       const payload = ios ? { files: [file] } : { files: [file], text: SHARE_CAPTION, title: SHARE_CAPTION };
@@ -128,12 +120,18 @@ export function ShareCard({ sid, cloneCount, audioUrl }) {
               className="mx-auto w-full max-w-[300px] rounded-2xl border border-line shadow-[0_18px_40px_-32px_rgba(40,30,10,0.55)]"
             />
           )}
-          <p className="mt-4 text-sm font-semibold text-gold">{SHARE_CAPTION}</p>
+          <p className="mt-4 flex items-center justify-center gap-2 whitespace-nowrap text-sm font-semibold text-gold">
+            <span>{SHARE_CAPTION}</span>
+            <button
+              type="button"
+              className="bg-transparent p-0 text-sm font-semibold text-gold underline underline-offset-2"
+              onClick={() => copyCaption().catch(() => setError("The caption could not be copied."))}
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </p>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <Button primary className="w-full sm:w-auto" onClick={onShare}>Share</Button>
-            <Button className="w-full sm:w-auto" onClick={() => copyCaption().catch(() => setError("The caption could not be copied."))}>
-              {copied ? "Copied" : "Copy"}
-            </Button>
             <Button className="w-full sm:w-auto" onClick={() => blobRef.current && triggerDownload(blobRef.current)}>Download</Button>
           </div>
         </>
