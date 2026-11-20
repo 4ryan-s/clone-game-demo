@@ -5,12 +5,7 @@ Data: a session folder is working data and is deleted when the session ends. A r
 session id) in data/voice_samples/ only if the participant ticked the optional box (see voicebank.py).
 """
 import asyncio
-<<<<<<< HEAD
-import base64
 import html
-import json
-=======
->>>>>>> e0d2087f0aeadc41a811766d2ee4e5aaaad42f50
 import logging
 import os
 import shutil
