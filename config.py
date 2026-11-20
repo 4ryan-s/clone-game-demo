@@ -96,6 +96,7 @@ PLAY_PAD_SECONDS = 0.2
 QWEN_URL = os.environ.get("QWEN_URL", "http://127.0.0.1:8766")
 # Several workers can share the GPU: QWEN_URLS="http://qwen:8766,http://qwen2:8766". Each request goes to the least busy one.
 QWEN_URLS = [u.strip().rstrip("/") for u in os.environ.get("QWEN_URLS", QWEN_URL).split(",") if u.strip()]
+QWEN_TOKEN = os.environ.get("QWEN_TOKEN", "")      # shared secret between the api and the workers (header X-Qwen-Token). Set it whenever a worker runs on another machine
 QWEN_PYTHON = venv_python("qwen")
 QWEN_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"        # Hugging Face id, downloaded into MODELS_DIR/hf by setup.py
 QWEN_TIMEOUT_S = 240       # one clip takes 15-50 s; a request that just missed a batch waits for that batch and then runs in the next one

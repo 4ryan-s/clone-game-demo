@@ -22,9 +22,17 @@ qwen3tts._IN_FLIGHT.clear()
 qwen3tts._IN_FLIGHT.update({u: 0 for u in config.QWEN_URLS})
 
 
+import base64  # noqa: E402
+import tempfile  # noqa: E402
+
+_REF = Path(tempfile.mkdtemp()) / "ref.wav"
+_REF.write_bytes(b"RIFFfake")
+_OK = {"ok": True, "sample_rate": 24000, "audio_b64": base64.b64encode(b"RIFFout").decode()}
+
+
 class Resp:
     def __init__(self, code=200, body=None):
-        self.status_code, self._b, self.text = code, body or {"ok": True, "sample_rate": 24000}, "x"
+        self.status_code, self._b, self.text = code, body or dict(_OK), "x"
         self.ok = code == 200
 
     def json(self):
@@ -32,7 +40,7 @@ class Resp:
 
 
 def clone():
-    return qwen3tts.Qwen3TTS().clone(Path("/tmp/r.wav"), "t", "hello", Path("/tmp/out/o.wav"))
+    return qwen3tts.Qwen3TTS().clone(_REF, "t", "hello", _REF.parent / "out" / "o.wav")
 
 
 def test_spreads_concurrent_requests():
@@ -100,3 +108,55 @@ def test_available_if_any_ready():
         assert qwen3tts.Qwen3TTS().available()[0] is True
     with mock.patch("requests.get", lambda url, **kw: Resp(503, {"ready": False})):
         assert qwen3tts.Qwen3TTS().available()[0] is False
+
+
+def test_audio_comes_back_over_http_and_the_ref_is_sent():
+    sent = {}
+
+    def post(url, **kw):
+        sent.update(kw["json"])
+        return Resp()
+
+    with mock.patch("requests.post", post):
+        clone()
+    assert base64.b64decode(sent["ref_b64"]) == b"RIFFfake" and "ref" not in sent
+    assert (_REF.parent / "out" / "o.wav").read_bytes() == b"RIFFout"
+
+
+def test_a_worker_that_just_failed_is_skipped_for_a_while():
+    import requests
+    calls = []
+
+    def post(url, **kw):
+        calls.append(url)
+        if url.startswith("http://a"):
+            raise requests.ConnectionError()
+        return Resp()
+
+    qwen3tts._DOWN_UNTIL.update({u: 0.0 for u in config.QWEN_URLS})
+    with mock.patch("requests.post", post):
+        clone()                                  # a is tried first, fails, b answers
+        calls.clear()
+        clone()                                  # a is marked down: b goes first
+    assert calls == ["http://b:1/clone"], calls
+    qwen3tts._DOWN_UNTIL.update({u: 0.0 for u in config.QWEN_URLS})
+
+
+def test_a_slow_worker_is_not_treated_as_down_and_the_clip_is_not_sent_twice():
+    import requests
+    calls = []
+
+    def post(url, **kw):
+        calls.append(url)
+        raise requests.ReadTimeout()
+
+    qwen3tts._DOWN_UNTIL.update({u: 0.0 for u in config.QWEN_URLS})
+    with mock.patch("requests.post", post):
+        try:
+            clone()
+        except EngineError:
+            pass
+        else:
+            raise AssertionError("expected EngineError")
+    assert len(calls) == 1, calls
+    assert all(v == 0.0 for v in qwen3tts._DOWN_UNTIL.values())

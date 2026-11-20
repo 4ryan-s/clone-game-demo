@@ -5,12 +5,16 @@ needs: with a transcript that does not match the audio it produced unintelligibl
 was clean. `verbatim` mode keeps filler words ("um", "uh") as spoken, so the transcript matches the audio and the fillers can be flagged.
 
 The key comes from SARVAM_API_KEY like the cloning engine and is never logged or returned in an error."""
+import logging
 import time
 
 import requests
 
 import config
 from engines.sarvam import _key
+
+
+log = logging.getLogger("stt")
 
 
 class SttError(RuntimeError):
@@ -35,11 +39,15 @@ def transcribe(wav_bytes: bytes) -> dict:
                 timeout=config.STT_TIMEOUT_S)
         except requests.RequestException as exc:
             last = f"request failed ({type(exc).__name__})"
+            log.warning("speech to text attempt %d/3 failed: %s", attempt + 1, last)
             continue
         if r.status_code == 200:
             j = r.json()
-            return {"text": (j.get("transcript") or "").strip(), "seconds": round(time.time() - t0, 2), "language": j.get("language_code")}
+            out = {"text": (j.get("transcript") or "").strip(), "seconds": round(time.time() - t0, 2), "language": j.get("language_code")}
+            log.info("speech to text ok in %.1fs (%d words, language %s, attempt %d)", out["seconds"], len(out["text"].split()), out["language"], attempt + 1)
+            return out
         last = f"HTTP {r.status_code}: {r.text[:150].replace(key, '<key>')}"
+        log.warning("speech to text attempt %d/3 failed: %s", attempt + 1, last)
         if r.status_code < 500 and r.status_code != 429:
             break
     raise SttError(f"Sarvam speech-to-text failed: {last}")

@@ -19,6 +19,8 @@ services:
         TORCH_VARIANT: ${TORCH_VARIANT:-cu128}
     environment:
       QWEN_HOST: 0.0.0.0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      QWEN_TOKEN: ${QWEN_TOKEN:-}
       QWEN_PORT: "8766"
       HF_HOME: /app/models/hf
       # Default is ONE worker with a batch of 6 (measured best on a 16 GB T4; two workers were slower). qwen2 is off unless COMPOSE_PROFILES=two-workers.
@@ -59,6 +61,8 @@ services:
         ONNX_GPU: "1"
     environment:
       QWEN_URLS: ${QWEN_URLS:-http://qwen:8766}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      QWEN_TOKEN: ${QWEN_TOKEN:-}
       SARVAM_API_KEY: ${SARVAM_API_KEY:-}
       HF_HOME: /app/models/hf
       SPECTRA_DEVICE: ${SPECTRA_DEVICE:-cuda}      # cpu frees about 2.2 GB of GPU memory (see .env.example)

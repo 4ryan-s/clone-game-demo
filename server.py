@@ -5,12 +5,10 @@ Data: a session folder is working data and is deleted when the session ends. A r
 session id) in data/voice_samples/ only if the participant ticked the optional box (see voicebank.py).
 """
 import asyncio
-import base64
-import json
 import logging
 import os
-import asyncio
 import shutil
+import threading
 import time
 from contextlib import asynccontextmanager
 
@@ -23,6 +21,7 @@ import audio
 import config
 import engines
 import game
+import logsetup
 import pipeline
 import scoring
 import speech_check
@@ -31,19 +30,30 @@ import store
 import voicebank
 from consent import CONSENT
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logsetup.setup()
 log = logging.getLogger("server")
-
-
-class _QuietPolling(logging.Filter):
-    """Every browser asks /status twice a second while clones are made; keep those out of the access log."""
-    def filter(self, record):
-        return "/status" not in record.getMessage()
-
-
-logging.getLogger("uvicorn.access").addFilter(_QuietPolling())
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 DEBUG = os.environ.get("DEMO_DEBUG") == "1"
+
+
+def _watch_workers() -> None:
+    """After a (re)start, say once for every Qwen worker whether it is ready, so a worker that never came up shows in the log."""
+    import requests
+    pending = set(config.QWEN_URLS)
+    for _ in range(60):                                          # up to about 5 minutes: the model takes a while to load
+        for url in sorted(pending):
+            try:
+                r = requests.get(url + "/health", timeout=3)
+                if r.ok and r.json().get("ready"):
+                    h = r.json()
+                    log.info("qwen worker %s is ready: %s %s, batching %s", url, h.get("device"), h.get("dtype"), h.get("batching"))
+                    pending.discard(url)
+            except requests.RequestException:
+                pass
+        if not pending:
+            return
+        time.sleep(5)
+    log.warning("qwen worker(s) still not ready after 5 minutes: %s", sorted(pending))
 
 
 @asynccontextmanager
@@ -53,6 +63,10 @@ async def lifespan(_app):
     n = store.purge_stale()
     if n:
         log.info("removed %d unfinished working sessions older than 24 h", n)
+    log.info("starting: engines=%s qwen_workers=%s sarvam_concurrency=%d clone_check_device=%s speech_to_text=%s debug=%s",
+             config.ENGINES[: config.MAX_ENGINES], config.QWEN_URLS, config.SARVAM_CONCURRENCY,
+             os.environ.get("SPECTRA_DEVICE", "cpu"), "on" if config.STT_ENABLED else "off", DEBUG)
+    threading.Thread(target=_watch_workers, name="worker-watch", daemon=True).start()
     yield
 
 
@@ -92,6 +106,7 @@ def create_session(body: ConsentIn):
 @app.post("/api/sessions/{sid}/recording")
 async def upload_recording(sid: str, file: UploadFile = File(...)):
     _need(sid)
+    t_upload = time.time()
     meta = store.read(sid, "meta.json", {})
     if meta.get("state") == "running":
         raise HTTPException(409, "Clones are being made. Wait for them to finish.")
@@ -123,7 +138,8 @@ async def upload_recording(sid: str, file: UploadFile = File(...)):
             # Agreed to keep it: copy into the numbered voice bank now, so it is not lost if they close the tab before Finish.
             # A re-record replaces the earlier take under the same number. No agreement: nothing is copied anywhere.
             try:
-                voicebank.save(sid, d / "original.wav", consent.get("version", ""), verdict["seconds"], verdict.get("transcript") or "")
+                number = voicebank.save(sid, d / "original.wav", consent.get("version", ""), verdict["seconds"], verdict.get("transcript") or "")
+                log.info("session %s voice sample saved as #%06d", sid, number)
             except OSError as exc:
                 log.error("could not save the voice sample for %s: %s", sid, exc)
                 raise HTTPException(500, "Your recording could not be saved. Please try again.")
@@ -133,6 +149,15 @@ async def upload_recording(sid: str, file: UploadFile = File(...)):
                 shutil.rmtree(p, ignore_errors=True)
             elif p.exists():
                 p.unlink()
+    # Numbers only: never the transcript or the audio.
+    words = len((verdict.get("transcript") or "").split())
+    log.info("session %s recording %s in %.1fs: %.1fs long, level %s dBFS, clipped %s, speech-to-text %s, %d words, speech %ss, longest pause %ss, "
+             "snr %s dB, fillers %d, issues %d%s",
+             sid, "accepted" if verdict["ok"] else "REJECTED", time.time() - t_upload, verdict.get("seconds", 0), verdict.get("level_dbfs"),
+             verdict.get("clipped_fraction"), "not run" if review is None else ("failed" if review["stt_error"] else "ok"), words,
+             review and review["speech_seconds"], review and review["longest_pause"], review and review["snr_db"],
+             len(review["fillers"]) if review else 0, len(verdict["issues"]),
+             f", stt error: {review['stt_error']}" if review and review["stt_error"] else "")
     return verdict
 
 
@@ -184,9 +209,15 @@ class PickIn(BaseModel):
 @app.post("/api/sessions/{sid}/pick")
 def pick(sid: str, body: PickIn):
     _need(sid)
-    if not game.find_card(sid, body.card):
+    card = game.find_card(sid, body.card)
+    if not card:
         raise HTTPException(404, "Unknown card")
-    return game.pick(sid, body.card)
+    t0 = time.time()
+    result = game.pick(sid, body.card)
+    log.info("session %s pick: chose the %s%s -> %s; reveal (clone check on %d clips) took %.2fs on %s", sid,
+             "real recording" if card["kind"] == "real" else "clone from ", "" if card["kind"] == "real" else card["engine"],
+             "WON" if result["won"] else "lost", len(result["cards"]), time.time() - t0, scoring.device() or "?")
+    return result
 
 
 @app.post("/api/sessions/{sid}/finish")
@@ -196,6 +227,7 @@ def finish(sid: str):
     _need(sid)
     kept = bool(store.read(sid, "consent.json", {}).get("retain"))
     store.delete(sid)
+    log.info("session %s finished: working files deleted, voice sample %s", sid, "kept (participant agreed)" if kept else "not kept")
     return {"deleted": not kept, "kept": kept}
 
 
@@ -210,6 +242,8 @@ def delete_session(sid: str):
     if not had_session and not removed:
         raise HTTPException(404, "Unknown session code")
     store.delete(sid)
+    log.info("session %s deletion requested: working session %s, voice sample %s", sid, "removed" if had_session else "already gone",
+             "removed" if removed else "none")
     return {"deleted": True, "sample_deleted": bool(removed)}
 
 

@@ -34,7 +34,9 @@ def _load():
     try:
         if not config.SPECTRA_ONNX.is_file():
             raise FileNotFoundError(f"{config.SPECTRA_ONNX} is missing. Run `python setup.py` or set SPECTRA_ONNX.")
-        sess = ort.InferenceSession(str(config.SPECTRA_ONNX), providers=_providers())
+        so = ort.SessionOptions()
+        so.log_severity_level = 3             # errors only: the default prints about 40 warning lines at every start
+        sess = ort.InferenceSession(str(config.SPECTRA_ONNX), sess_options=so, providers=_providers())
         active = sess.get_providers()[0]
         if os.environ.get("SPECTRA_DEVICE") == "cuda" and active != "CUDAExecutionProvider":
             raise RuntimeError(

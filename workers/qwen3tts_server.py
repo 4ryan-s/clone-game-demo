@@ -1,16 +1,24 @@
 """Always-on Qwen3-TTS worker. Run with the qwen environment's Python (see start_demo.ps1).
 
   GET  /health -> {"ready": true, "device": "cuda:0", "batching": {...}}   (answers at any time, also while generating)
-  POST /clone  {"ref", "ref_text", "text", "out"}  (absolute paths) -> {"ok": true, "seconds": ..., "sample_rate": ..., "batch_size": n}
+  POST /clone  {"ref_b64" (base64 WAV), "ref_text", "text"} -> {"ok": true, "audio_b64": ..., "seconds": ..., "sample_rate": ..., "batch_size": n, ...}
+               Audio travels in the request and the reply, so the worker can run on another machine.
+               (Old same-disk mode with "ref"/"out" paths: only when QWEN_ALLOW_PATHS=1, for tests/qwen_worker_live.py.)
 
-Listens on 127.0.0.1 only and loads the model once. Requests are served by several threads, but the model is only ever
-called from the batching thread (workers/batcher.py): requests that arrive within QWEN_BATCH_WINDOW_S of each other are
-generated together as one batch of up to QWEN_MAX_BATCH, which takes about as long as a single clip.
+Binds to QWEN_HOST (default 127.0.0.1; the compose files use 0.0.0.0). Anything reachable from a network MUST set QWEN_TOKEN (sent as the
+X-Qwen-Token header); traffic is plain HTTP, so use a private network or VPN between machines. It loads the model once. Requests are served
+by several threads, but the model is only ever called from the batching thread (workers/batcher.py): requests that arrive within
+QWEN_BATCH_WINDOW_S of each other are generated together as one batch of up to QWEN_MAX_BATCH, which takes about as long as a single clip.
 """
+import base64
+import hmac
 import json
 import logging
 import os
+import re
+import shutil
 import socket
+import tempfile
 import sys
 import threading
 import time
@@ -23,11 +31,15 @@ import tailtrim  # noqa: E402
 from workers.batcher import Batcher  # noqa: E402
 
 WORKER = os.environ.get("QWEN_WORKER_NAME") or socket.gethostname()
-logging.basicConfig(level=logging.INFO, format=f"%(asctime)s %(levelname)s [{WORKER}] %(name)s: %(message)s")
+logging.basicConfig(level=getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO),
+                    format=f"%(asctime)s %(levelname)-7s [{WORKER}] %(name)s: %(message)s")
 log = logging.getLogger("qwen")
 
 os.environ.setdefault("HF_HOME", str(config.HF_HOME))
 PORT = int(os.environ.get("QWEN_PORT", config.QWEN_URL.rsplit(":", 1)[1]))
+TOKEN = os.environ.get("QWEN_TOKEN", "")
+ALLOW_PATHS = os.environ.get("QWEN_ALLOW_PATHS", "") == "1"          # legacy: caller names file paths on this machine (never enable on a network-exposed worker)
+MAX_BODY_BYTES = 24 * 1024 * 1024                                  # a recording is at most 8 MB, which is about 11 MB as base64
 MAX_BATCH = int(os.environ.get("QWEN_MAX_BATCH", "4"))
 BATCH_WINDOW_S = float(os.environ.get("QWEN_BATCH_WINDOW_S", "2.0"))
 
@@ -212,17 +224,59 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path != "/clone":
             return self._send(404, {"error": "not found"})
+        if TOKEN and not hmac.compare_digest(self.headers.get("X-Qwen-Token", "").encode(), TOKEN.encode()):
+            log.warning("refused a request from %s: bad or missing X-Qwen-Token", self.client_address[0])
+            return self._send(401, {"ok": False, "error": "bad or missing X-Qwen-Token"})
         if MODEL is None:
             return self._send(503, {"ok": False, "error": LOAD_ERROR or "still loading"})
         try:
-            job = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
-            result = BATCHER.submit({k: job[k] for k in ("ref", "ref_text", "text", "out")})
+            length = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            return self._send(400, {"ok": False, "error": "bad Content-Length"})
+        if length > MAX_BODY_BYTES:
+            log.warning("refused a request from %s: %d bytes is over the %d byte limit", self.client_address[0], length, MAX_BODY_BYTES)
+            return self._send(413, {"ok": False, "error": "request too large"})
+        tmp = None
+        payload = {}
+        try:
+            try:
+                job = json.loads(self.rfile.read(length))
+                ref_b64 = job.get("ref_b64")
+                tag = re.sub(r"[^A-Za-z0-9_-]", "", str(job.get("tag", "")))[:16]
+                if ref_b64:
+                    ref_bytes = base64.b64decode(ref_b64, validate=True)
+                    payload = {"ref_text": job["ref_text"], "text": job["text"], "tag": tag}
+                elif ALLOW_PATHS:
+                    payload = {k: job[k] for k in ("ref", "ref_text", "text", "out")}
+                else:
+                    raise ValueError("send the reference audio as ref_b64")
+            except (ValueError, KeyError, TypeError, AttributeError) as exc:          # includes bad JSON and bad base64: the caller's mistake, not ours
+                log.warning("bad request from %s: %s: %s", self.client_address[0], type(exc).__name__, str(exc)[:120])
+                return self._send(400, {"ok": False, "error": f"bad request: {type(exc).__name__}: {str(exc)[:120]}"})
+            if ref_b64:
+                # Audio travels in the request and comes back in the reply, so the worker needs no shared disk (it can run on another machine).
+                tmp = tempfile.mkdtemp(prefix="qwen_")
+                payload["ref"], payload["out"] = os.path.join(tmp, "ref.wav"), os.path.join(tmp, "out.wav")
+                with open(payload["ref"], "wb") as fh:
+                    fh.write(ref_bytes)
+            result = BATCHER.submit(payload)
+            if tmp:
+                with open(payload["out"], "rb") as fh:
+                    result = {**result, "audio_b64": base64.b64encode(fh.read()).decode()}
             self._send(200, result)
         except Exception as exc:  # noqa: BLE001
+            log.error("clone request [%s] failed: %s: %s", payload.get("tag", "-"), type(exc).__name__, str(exc)[:200])
             return self._send(500, {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:200]}"})
+        finally:
+            if tmp:
+                shutil.rmtree(tmp, ignore_errors=True)
 
     def log_message(self, *args):
         pass
 
 
-Server((os.environ.get("QWEN_HOST", "127.0.0.1"), PORT), Handler).serve_forever()
+HOST = os.environ.get("QWEN_HOST", "127.0.0.1")
+if HOST not in ("127.0.0.1", "localhost", "::1") and not TOKEN:
+    log.warning("listening on %s without QWEN_TOKEN: anyone who can reach port %d can use this worker. Fine only on a private docker network; "
+                "set QWEN_TOKEN when the port is reachable from other machines", HOST, PORT)
+Server((HOST, PORT), Handler).serve_forever()

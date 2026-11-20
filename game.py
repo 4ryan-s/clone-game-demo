@@ -1,8 +1,10 @@
 """The listening game for one session: shuffled neutral cards, the pick, and the reveal.
 The browser only ever gets random card ids. Which card is real, and which engine made each clone, stays in meta.json until the pick."""
 import io
+import logging
 import secrets
 import random
+import time
 
 import numpy as np
 import soundfile as sf
@@ -12,6 +14,8 @@ import config
 import scoring
 import stats
 import store
+
+log = logging.getLogger("game")
 
 
 def _clip_path(sid: str, entry: dict):
@@ -81,11 +85,14 @@ def pick(sid: str, card_id: str) -> dict:
 def reveal(sid: str, meta: dict | None = None) -> dict:
     meta = meta or store.read(sid, "meta.json", {})
     out = []
+    t0 = time.time()
     for c in meta["cards"]:
         x, sr = sf.read(str(_clip_path(sid, c)), dtype="float32")
         m = round(scoring.margin(x if x.ndim == 1 else x.mean(axis=1)), 1)
         out.append({"card": c["id"], "real": c["kind"] == "real", "who": "You" if c["kind"] == "real" else config.ENGINE_LABELS.get(c["engine"], c["engine"]),
                     "margin": m, "says_clone": m < config.CUTOFF, "seconds": round(len(x) / sr, 1)})
+    log.info("session %s reveal: scored %d clips in %.2fs: %s", sid, len(out), time.time() - t0,
+             ", ".join(f"{'real' if r['real'] else r['who']} {r['margin']:+.1f}" for r in out))
     picked = next(r for r in out if r["card"] == meta["pick"])
     # Cache the scores with the session: they are what a training run would want next to the audio.
     store.update_meta(sid, lambda mm: mm.update(scores={r["card"]: r["margin"] for r in out}, cutoff=config.CUTOFF))
