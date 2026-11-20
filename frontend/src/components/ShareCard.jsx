@@ -74,11 +74,22 @@ export function ShareCard({ sid, cloneCount, audioUrl }) {
       ) : (
         <>
           {preview && (
-            <img
-              src={preview}
-              alt="Your image to share"
-              className="mx-auto w-full max-w-[300px] rounded-2xl border border-line shadow-[0_18px_40px_-32px_rgba(40,30,10,0.55)]"
-            />
+            <div className="relative mx-auto w-full max-w-[300px]">
+              <img
+                src={preview}
+                alt="Your image to share"
+                className="w-full rounded-2xl border border-line shadow-[0_18px_40px_-32px_rgba(40,30,10,0.55)]"
+              />
+              <a
+                href={`https://${SHARE_URL}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Open ${SHARE_URL}`}
+                title={SHARE_URL}
+                className="absolute rounded-full"
+                style={{ left: "20.4%", top: "62.8%", width: "59.3%", height: "6.8%" }}
+              />
+            </div>
           )}
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <Button primary className="w-full sm:w-auto" onClick={onShare}>Share</Button>

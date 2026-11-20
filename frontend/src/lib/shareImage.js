@@ -62,7 +62,7 @@ function spaced(ctx, px) {
   if ("letterSpacing" in ctx) ctx.letterSpacing = `${px}px`;
 }
 
-// waveform: numbers 0..1 (one per bar). cloneCount: how many fake voices were in the round. code: session code.
+// waveform: numbers 0..1 (one per bar). cloneCount: how many fake voices were in the round.
 export async function buildShareImage({ waveform, cloneCount, code, logoSrc = "/josh-logo.png" }) {
   const canvas = document.createElement("canvas");
   canvas.width = W;
@@ -162,7 +162,7 @@ export async function buildShareImage({ waveform, cloneCount, code, logoSrc = "/
     ctx.fillStyle = SOFT;
     ctx.font = `600 20px ${SANS}`;
     spaced(ctx, 3);
-    const label = "SESSION CODE";
+    const label = "CODE";
     const labelW = ctx.measureText(label).width;
     spaced(ctx, 0);
     ctx.font = `600 30px ${SANS}`;
@@ -181,7 +181,7 @@ export async function buildShareImage({ waveform, cloneCount, code, logoSrc = "/
   // Deletion contact.
   ctx.fillStyle = SOFT;
   ctx.font = `400 23px ${SANS}`;
-  const note = `For any queries about your voice sample or its permanent deletion, contact ${SUPPORT_EMAIL} with the session code in the subject.`;
+  const note = `For any queries about your voice sample or its permanent deletion, contact ${SUPPORT_EMAIL} with the code in the subject.`;
   let y = 1066;
   for (const line of wrap(ctx, note, 800)) {
     ctx.fillText(line, W / 2, y);
