@@ -1,9 +1,11 @@
-// Draws the share image: 1080 x 1350 (4:5, the tallest feed post) PNG on a canvas, in the browser, so it is instant.
+// Draws the share image: 1080 x 1920 (9:16, an Instagram story) PNG on a canvas, in the browser, so it is instant.
+// A story-sized picture is what makes "Instagram Stories" show up in the phone share sheet.
 // Flat colours, one typeface for the headlines, no glow, sparkles or frames. The waveform is the player's own voice.
 import { SHARE_URL, SUPPORT_EMAIL } from "./shareConfig";
 
 const W = 1080;
-const H = 1350;
+const H = 1920;
+const LAYOUT_H = 1350;
 const GOLD = "#d8a94a";
 const CORAL = "#ee6a55";
 const CREAM = "#f3e9d8";
@@ -87,6 +89,8 @@ export async function buildShareImage({ waveform, cloneCount, code, logoSrc = "/
   bg.addColorStop(1, "#150709");
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  ctx.translate(0, (H - LAYOUT_H) / 2);
 
   const maxText = W - 160;
   ctx.textAlign = "center";
@@ -205,6 +209,7 @@ export async function buildShareImage({ waveform, cloneCount, code, logoSrc = "/
   } catch {
     // no logo available; carry on
   }
+  ctx.restore();
 
   const dataUrl = canvas.toDataURL("image/png");
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));

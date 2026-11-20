@@ -289,16 +289,20 @@ _SHARE_PAGE = """<!doctype html><html lang="en"><head>
   __NOTE__
   <img src="__IMG__" alt="Your image to share">
   <div class="row">
-    <a class="btn primary" href="__IMG__" download="real-or-clone-share.png">Download</a>
-    <button class="btn ghost" id="share" type="button">Share</button>
+    <button class="btn primary" id="share" type="button">Share</button>
+    <a class="btn ghost" href="__IMG__" download="real-or-clone-share.png">Download</a>
   </div>
 <script>
   var url = "__IMG__";
+  var caption = "#RCI26 #RCI @joshsoftware";
+  var ready = fetch(url).then(function (r) { return r.blob(); });
   document.getElementById("share").addEventListener("click", async function () {
     try {
-      var blob = await (await fetch(url)).blob();
+      var blob = await ready;
       var file = new File([blob], "real-or-clone-share.png", { type: "image/png" });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "Real or Clone" }); }
+      var withCaption = { files: [file], text: caption };
+      if (navigator.canShare && navigator.canShare(withCaption)) { await navigator.share(withCaption); }
+      else if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); }
       else { window.location.href = url; }
     } catch (e) {}
   });

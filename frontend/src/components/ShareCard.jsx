@@ -4,7 +4,7 @@ import { Button, ErrorNote } from "./ui";
 import { api } from "../lib/api";
 import { buildShareImage } from "../lib/shareImage";
 import { fetchWaveform, seededWaveform } from "../lib/waveform";
-import { SHARE_FILE_NAME, SHARE_URL } from "../lib/shareConfig";
+import { SHARE_CAPTION, SHARE_FILE_NAME } from "../lib/shareConfig";
 
 function triggerDownload(blob) {
   const url = URL.createObjectURL(blob);
@@ -66,12 +66,11 @@ export function ShareCard({ sid, cloneCount, audioUrl }) {
       const blob = blobRef.current;
       if (!blob) return;
       const file = new File([blob], SHARE_FILE_NAME, { type: "image/png" });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: "Real or Clone",
-          text: `I identified my original voice among ${cloneCount} deep fake${cloneCount === 1 ? "" : "s"}! Can you tell your voice from a clone? ${SHARE_URL}`,
-        });
+      const withCaption = { files: [file], text: SHARE_CAPTION };
+      if (navigator.canShare && navigator.canShare(withCaption)) {
+        await navigator.share(withCaption);
+      } else if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file] });
       } else {
         triggerDownload(blob);
         setNote("Sharing is not available here, so the image was saved. You can post it from your files.");
