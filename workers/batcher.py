@@ -15,13 +15,16 @@ If a batch fails as a whole, its requests are retried one at a time, so one bad 
 
 This module knows nothing about the model: run_batch(payloads) -> list of results (a dict, or an Exception for that one request).
 """
+import logging
 import queue
 import threading
 import time
 
+log = logging.getLogger("batcher")
+
 
 class _Job:
-    __slots__ = ("payload", "done", "result", "error", "queued_at")
+    __slots__ = ("payload", "done", "result", "error", "queued_at", "meta")
 
     def __init__(self, payload):
         self.payload = payload
@@ -29,6 +32,7 @@ class _Job:
         self.result = None
         self.error = None
         self.queued_at = time.monotonic()
+        self.meta = {}
 
 
 class Batcher:
@@ -38,6 +42,7 @@ class Batcher:
         self.window_s = max(0.0, float(window_s))
         self._queue: "queue.Queue[_Job]" = queue.Queue()
         self._lock = threading.Lock()
+        self._batch_no = 0
         self.stats = {"batches": 0, "jobs": 0, "last_batch": 0, "largest_batch": 0, "running": 0}
         threading.Thread(target=self._loop, name="batcher", daemon=True).start()
 
@@ -62,22 +67,35 @@ class Batcher:
         while True:
             batch = [self._queue.get()]
             deadline = time.monotonic() + self.window_s
+            reason = "full"
             while len(batch) < self.max_batch:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
+                    reason = "window expired"
                     break
                 try:
                     batch.append(self._queue.get(timeout=remaining))
                 except queue.Empty:
+                    reason = "window expired"
                     break
-            self._execute(batch)
+            self._execute(batch, reason)
 
-    def _execute(self, batch):
+    def _execute(self, batch, reason="full"):
         with self._lock:
             self.stats["running"] = len(batch)
+            self._batch_no += 1
+            no = self._batch_no
+        start = time.monotonic()
+        waits = [start - j.queued_at for j in batch]
+        log.info("batch #%d start: %d request(s) (%s, max %d), still queued %d, sessions %s, waited %s",
+                 no, len(batch), reason, self.max_batch, self._queue.qsize(), [j.payload.get("tag", "-") for j in batch],
+                 ", ".join("%.1fs" % w for w in waits))
+        for j, w in zip(batch, waits):
+            j.meta = {"batch_id": no, "queue_wait_s": round(w, 2), "batch_reason": reason}
         try:
             self._run(batch)
         finally:
+            log.info("batch #%d finished in %.1fs", no, time.monotonic() - start)
             with self._lock:
                 self.stats["batches"] += 1
                 self.stats["jobs"] += len(batch)
@@ -94,6 +112,7 @@ class Batcher:
             if len(batch) == 1:
                 self._finish(batch[0], exc)
                 return
+            log.warning("batch of %d failed (%s: %s): retrying the requests one at a time", len(batch), type(exc).__name__, str(exc)[:150])
             for job in batch:                       # retry one at a time: only the request that is really bad fails
                 try:
                     self._finish(job, self._run_batch([job.payload])[0])
@@ -108,5 +127,7 @@ class Batcher:
         if isinstance(result, BaseException):
             job.error = result
         else:
+            if isinstance(result, dict):
+                result.update(job.meta)
             job.result = result
         job.done.set()

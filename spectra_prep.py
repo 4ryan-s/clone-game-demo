@@ -24,6 +24,7 @@ class _Silero:
         opts = ort.SessionOptions()
         opts.inter_op_num_threads = 1
         opts.intra_op_num_threads = 1
+        opts.log_severity_level = 3          # errors only (the default prints a warning for every operator on every start)
         self.session = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"], sess_options=opts)
         self.reset()
 

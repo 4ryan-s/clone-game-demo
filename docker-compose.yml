@@ -10,7 +10,8 @@
 # Public HTTPS (microphone): docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
 
 services:
-  qwen:
+  qwen: &qwen
+    hostname: qwen                # shows up as the worker name in the logs
     build:
       context: .
       dockerfile: Dockerfile.qwen
@@ -18,8 +19,16 @@ services:
         TORCH_VARIANT: ${TORCH_VARIANT:-cu128}
     environment:
       QWEN_HOST: 0.0.0.0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      QWEN_TOKEN: ${QWEN_TOKEN:-}
       QWEN_PORT: "8766"
       HF_HOME: /app/models/hf
+      # Default is ONE worker with a batch of 6 (measured best on a 16 GB T4; two workers were slower). qwen2 is off unless COMPOSE_PROFILES=two-workers.
+      QWEN_MAX_BATCH: ${QWEN_MAX_BATCH:-6}
+      QWEN_BATCH_WINDOW_S: ${QWEN_BATCH_WINDOW_S:-1.0}
+      PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+      QWEN_BUDGET_REF_FACTOR: ${QWEN_BUDGET_REF_FACTOR:-1.3}
+      QWEN_GPU_MEM_FRACTION: ${QWEN_GPU_MEM_FRACTION:-0.75}
     volumes:
       - ./models:/app/models
       - ./data:/app/data
@@ -38,6 +47,12 @@ services:
       retries: 40
       start_period: 180s
 
+  # Second worker (optional): same image and settings, its own model copy. Only started with COMPOSE_PROFILES=two-workers.
+  qwen2:
+    <<: *qwen
+    hostname: qwen2
+    profiles: ["two-workers"]
+
   api:
     build:
       context: .
@@ -45,10 +60,12 @@ services:
       args:
         ONNX_GPU: "1"
     environment:
-      QWEN_URL: http://qwen:8766
+      QWEN_URLS: ${QWEN_URLS:-http://qwen:8766}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      QWEN_TOKEN: ${QWEN_TOKEN:-}
       SARVAM_API_KEY: ${SARVAM_API_KEY:-}
       HF_HOME: /app/models/hf
-      SPECTRA_DEVICE: cuda
+      SPECTRA_DEVICE: ${SPECTRA_DEVICE:-cuda}      # cpu frees about 2.2 GB of GPU memory (see .env.example)
     deploy:
       resources:
         reservations:
@@ -64,6 +81,9 @@ services:
     depends_on:
       qwen:
         condition: service_healthy
+      qwen2:
+        condition: service_healthy
+        required: false           # not started in the default one-worker setup
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]

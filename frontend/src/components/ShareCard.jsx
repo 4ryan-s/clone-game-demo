@@ -4,7 +4,7 @@ import { Button, ErrorNote } from "./ui";
 import { api } from "../lib/api";
 import { buildShareImage } from "../lib/shareImage";
 import { fetchWaveform, seededWaveform } from "../lib/waveform";
-import { SHARE_FILE_NAME, SHARE_URL } from "../lib/shareConfig";
+import { SHARE_CAPTION, SHARE_FILE_NAME } from "../lib/shareConfig";
 
 function triggerDownload(blob) {
   const url = URL.createObjectURL(blob);
@@ -25,6 +25,7 @@ export function ShareCard({ sid, cloneCount, audioUrl }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
+  const [copied, setCopied] = useState(false);
   const blobRef = useRef(null);
   const startedRef = useRef(false);
 
@@ -60,18 +61,31 @@ export function ShareCard({ sid, cloneCount, audioUrl }) {
     })();
   }, [sid, cloneCount, audioUrl]);
 
+  async function copyCaption() {
+    await navigator.clipboard.writeText(SHARE_CAPTION);
+    setCopied(true);
+  }
+
   async function onShare() {
     setError("");
     try {
       const blob = blobRef.current;
       if (!blob) return;
+      try {
+        await navigator.clipboard.writeText(SHARE_CAPTION);
+      } catch {
+        // the booth browser may block the clipboard; the share still goes out
+      }
       const file = new File([blob], SHARE_FILE_NAME, { type: "image/png" });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: "Real or Clone",
-          text: `I identified my original voice among ${cloneCount} deep fake${cloneCount === 1 ? "" : "s"}! Can you tell your voice from a clone? ${SHARE_URL}`,
-        });
+      const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const payload = ios ? { files: [file] } : { files: [file], text: SHARE_CAPTION, title: SHARE_CAPTION };
+      if (navigator.share) {
+        try {
+          await navigator.share(payload);
+        } catch (err) {
+          if (err && err.name === "AbortError") return;
+          await navigator.share({ files: [file] });
+        }
       } else {
         triggerDownload(blob);
         setNote("Sharing is not available here, so the image was saved. You can post it from your files.");
@@ -106,6 +120,16 @@ export function ShareCard({ sid, cloneCount, audioUrl }) {
               className="mx-auto w-full max-w-[300px] rounded-2xl border border-line shadow-[0_18px_40px_-32px_rgba(40,30,10,0.55)]"
             />
           )}
+          <p className="mt-4 flex items-center justify-center gap-2 whitespace-nowrap text-sm font-semibold text-gold">
+            <span>{SHARE_CAPTION}</span>
+            <button
+              type="button"
+              className="bg-transparent p-0 text-sm font-semibold text-gold underline underline-offset-2"
+              onClick={() => copyCaption().catch(() => setError("The caption could not be copied."))}
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </p>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <Button primary className="w-full sm:w-auto" onClick={onShare}>Share</Button>
             <Button className="w-full sm:w-auto" onClick={() => blobRef.current && triggerDownload(blobRef.current)}>Download</Button>

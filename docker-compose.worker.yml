@@ -1,0 +1,51 @@
+# A Qwen3-TTS worker on its OWN GPU machine, used by the main demo server (its api lists this machine's URL in QWEN_URLS).
+#
+# On the worker machine (NVIDIA GPU, Docker, the nvidia container toolkit):
+#   git clone <repo> && cd clone-game-demo
+#   cp .env.example .env            # set QWEN_TOKEN to a long random string (the same one as on the main server)
+#   docker compose -f docker-compose.worker.yml build
+#   docker compose -f docker-compose.worker.yml run --rm --no-deps qwen python docker/download_models.py
+#   docker compose -f docker-compose.worker.yml up -d
+# Open port 8766 in the cloud firewall / security group ONLY to the main server's private address. Traffic (the token and the voice audio) is
+# plain HTTP, so keep it on a private network or VPN, never the public internet.
+#
+# On the main server, in .env:
+#   QWEN_URLS=http://qwen:8766,http://<worker private ip>:8766
+#   QWEN_TOKEN=<the same string>
+services:
+  qwen:
+    build:
+      context: .
+      dockerfile: Dockerfile.qwen
+      args:
+        TORCH_VARIANT: ${TORCH_VARIANT:-cu128}
+    environment:
+      QWEN_HOST: 0.0.0.0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      QWEN_PORT: "8766"
+      QWEN_TOKEN: ${QWEN_TOKEN:?set QWEN_TOKEN in .env (the same value as on the main server)}
+      QWEN_MAX_BATCH: ${QWEN_MAX_BATCH:-6}
+      QWEN_BATCH_WINDOW_S: ${QWEN_BATCH_WINDOW_S:-1.0}
+      QWEN_GPU_MEM_FRACTION: ${QWEN_GPU_MEM_FRACTION:-0.9}      # this GPU has no other user, so the worker may take most of it
+      QWEN_BUDGET_REF_FACTOR: ${QWEN_BUDGET_REF_FACTOR:-1.3}
+      PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+      HF_HOME: /app/models/hf
+    hostname: qwen-remote
+    ports:
+      - "8766:8766"
+    volumes:
+      - ./models:/app/models
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8766/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 180s

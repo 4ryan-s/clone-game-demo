@@ -10,6 +10,9 @@ class Engine:
     name = "base"
     lock_group: str | None = None   # engines sharing a group run one at a time (e.g. both Sarvam clones share one remote rate limit)
 
+    max_concurrent = 1              # how many calls of this lock group may run at once, across all sessions
+    serialize = True                # False: the engine copes with concurrent calls itself (Qwen's worker batches them), so the pipeline does not lock it
+
     @property
     def lock_key(self) -> str:
         """The name used to serialize this engine against others. Defaults to its own name (no sharing)."""

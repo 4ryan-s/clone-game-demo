@@ -116,6 +116,9 @@ PLAY_PAD_SECONDS = 0.2
 
 # Local engines. Each runs as a small always-on worker in its own environment and keeps its model loaded on the GPU.
 QWEN_URL = os.environ.get("QWEN_URL", "http://127.0.0.1:8766")
+# Several workers can share the GPU: QWEN_URLS="http://qwen:8766,http://qwen2:8766". Each request goes to the least busy one.
+QWEN_URLS = [u.strip().rstrip("/") for u in os.environ.get("QWEN_URLS", QWEN_URL).split(",") if u.strip()]
+QWEN_TOKEN = os.environ.get("QWEN_TOKEN", "")      # shared secret between the api and the workers (header X-Qwen-Token). Set it whenever a worker runs on another machine
 QWEN_PYTHON = venv_python("qwen")
 QWEN_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"        # Hugging Face id, downloaded into MODELS_DIR/hf by setup.py
 QWEN_LANGUAGE = "Auto"     # the language tag given to Qwen3-TTS with the text: "Auto" lets the model take it from the reference; "English" forces English (see README: Auto misread fewer words in a 6-recording test)
@@ -123,6 +126,7 @@ QWEN_TIMEOUT_S = 240      # one clip takes 15-50 s; a request that just missed a
 
 HF_HOME = MODELS_DIR / "hf"
 SARVAM_TIMEOUT_S = 90
+SARVAM_CONCURRENCY = int(os.environ.get("SARVAM_CONCURRENCY", "3"))   # Sarvam clones allowed at the same time across ALL sessions (1 = one after another). Lower it if you see HTTP 429
 SARVAM_MAX_RETRIES = 1        # on HTTP 429 (rate limit): retry a clone at most once, so a throttle does not trigger a burst of extra calls
 SARVAM_RETRY_BASE_S = 4.0     # wait before the single retry (unless the server sends a longer Retry-After header)
 
