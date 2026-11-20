@@ -281,6 +281,9 @@ _SHARE_PAGE = """<!doctype html><html lang="en"><head>
   p { margin:0; color:#c8b8a4; text-align:center; }
   img { width:100%; max-width:520px; height:auto; border-radius:12px; }
   .row { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  .capline { display:flex; align-items:baseline; justify-content:center; gap:8px; margin:0; white-space:nowrap; }
+  .cap { color:#d8a94a; font-weight:700; font-size:16px; }
+  .copytext { appearance:none; background:none; border:0; padding:0; margin:0; color:#d8a94a; font:inherit; font-weight:700; font-size:16px; line-height:1; text-decoration:underline; cursor:pointer; }
   a.btn, button.btn { appearance:none; cursor:pointer; text-decoration:none; font-size:16px; font-weight:600; padding:14px 26px; border-radius:999px; border:1px solid #d8a94a; }
   .primary { background:#d8a94a; color:#1a0a0d; }
   .ghost { background:transparent; color:#f3e9d8; }
@@ -288,18 +291,50 @@ _SHARE_PAGE = """<!doctype html><html lang="en"><head>
   <h1>Your image is ready</h1>
   __NOTE__
   <img src="__IMG__" alt="Your image to share">
+  <p class="capline"><span class="cap">#RCI26 #RCI @joshsoftware</span> <button class="copytext" id="copy" type="button">Copy</button></p>
   <div class="row">
-    <a class="btn primary" href="__IMG__" download="real-or-clone-share.png">Download</a>
-    <button class="btn ghost" id="share" type="button">Share</button>
+    <button class="btn primary" id="share" type="button">Share</button>
+    <a class="btn ghost" href="__IMG__" download="real-or-clone-share.png">Download</a>
   </div>
 <script>
   var url = "__IMG__";
+  var caption = "#RCI26 #RCI @joshsoftware";
+  var ready = fetch(url).then(function (r) { return r.blob(); });
+  var ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  function markCopied() {
+    document.getElementById("copy").textContent = "Copied";
+  }
+  async function copyCaption() {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(caption);
+    } else {
+      var box = document.createElement("textarea");
+      box.value = caption;
+      document.body.appendChild(box);
+      box.select();
+      document.execCommand("copy");
+      box.remove();
+    }
+    markCopied();
+  }
+  copyCaption().catch(function () {});
+  document.getElementById("copy").addEventListener("click", function () {
+    copyCaption().catch(function () {});
+  });
   document.getElementById("share").addEventListener("click", async function () {
+    try { await copyCaption(); } catch (e) {}
+    await new Promise(function (r) { setTimeout(r, 700); });
     try {
-      var blob = await (await fetch(url)).blob();
+      var blob = await ready;
       var file = new File([blob], "real-or-clone-share.png", { type: "image/png" });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "Real or Clone" }); }
-      else { window.location.href = url; }
+      var payload = ios ? { files: [file] } : { files: [file], text: caption, title: caption };
+      if (navigator.share) {
+        try { await navigator.share(payload); }
+        catch (err) {
+          if (err && err.name === "AbortError") return;
+          await navigator.share({ files: [file] });
+        }
+      } else { window.location.href = url; }
     } catch (e) {}
   });
 </script></body></html>"""
