@@ -17,6 +17,8 @@ CONSENT = {
         "Nothing else about you is collected. We do not ask for your name. You get a session code.",
         "You can stop at any point. The copies are always deleted when you finish. If you do not tick the second box below, "
         "your own recording is deleted too. If you do tick it, only your own recording is kept.",
+        "If you open Share at the end, a copy of your share picture (it shows your session code, not your name) is kept on this computer for 7 days "
+        "so your phone can download it. It is deleted at once if you ask for your data to be deleted.",
         "You can ask for your data to be deleted later with your session code" +
         (f" by contacting {config.CONTACT}." if config.CONTACT else ". Ask the demo host how."),
     ],
