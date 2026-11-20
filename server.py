@@ -283,16 +283,16 @@ _SHARE_PAGE = """<!doctype html><html lang="en"><head>
   .row { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
   .cap { color:#d8a94a; font-weight:700; font-size:18px; user-select:all; }
   a.btn, button.btn { appearance:none; cursor:pointer; text-decoration:none; font-size:16px; font-weight:600; padding:14px 26px; border-radius:999px; border:1px solid #d8a94a; }
-  .primary { background:#d8a94a; color:#1a0a0d; }
+  .primary, .copied { background:#d8a94a; color:#1a0a0d; }
   .ghost { background:transparent; color:#f3e9d8; }
 </style></head><body>
   <h1>Your image is ready</h1>
   __NOTE__
   <img src="__IMG__" alt="Your image to share">
   <p class="cap" id="cap">#RCI26 #RCI @joshsoftware</p>
-  <p id="hint">Tap Share. WhatsApp receives this caption. If Instagram leaves it blank, paste it — Share copies it for you.</p>
   <div class="row">
     <button class="btn primary" id="share" type="button">Share</button>
+    <button class="btn ghost" id="copy" type="button">Copy</button>
     <a class="btn ghost" href="__IMG__" download="real-or-clone-share.png">Download</a>
   </div>
 <script>
@@ -300,14 +300,39 @@ _SHARE_PAGE = """<!doctype html><html lang="en"><head>
   var caption = "#RCI26 #RCI @joshsoftware";
   var ready = fetch(url).then(function (r) { return r.blob(); });
   var ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  var copyTimer = 0;
+  function markCopied() {
+    var btn = document.getElementById("copy");
+    btn.textContent = "Copied";
+    btn.className = "btn copied";
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(function () {
+      btn.textContent = "Copy";
+      btn.className = "btn ghost";
+    }, 2000);
+  }
+  async function copyCaption() {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(caption);
+    } else {
+      var box = document.createElement("textarea");
+      box.value = caption;
+      document.body.appendChild(box);
+      box.select();
+      document.execCommand("copy");
+      box.remove();
+    }
+    markCopied();
+  }
+  document.getElementById("copy").addEventListener("click", function () {
+    copyCaption().catch(function () {});
+  });
   document.getElementById("share").addEventListener("click", async function () {
-    var hint = document.getElementById("hint");
-    try { await navigator.clipboard.writeText(caption); } catch (e) {}
+    try { await copyCaption(); } catch (e) {}
+    await new Promise(function (r) { setTimeout(r, 700); });
     try {
       var blob = await ready;
       var file = new File([blob], "real-or-clone-share.png", { type: "image/png" });
-      // iPhone rejects an image and a caption in one share, and that rejection removes Instagram Stories.
-      // Android can carry the caption, so WhatsApp gets it. The caption is copied either way.
       var payload = ios ? { files: [file] } : { files: [file], text: caption, title: caption };
       if (navigator.share) {
         try { await navigator.share(payload); }
@@ -316,7 +341,6 @@ _SHARE_PAGE = """<!doctype html><html lang="en"><head>
           await navigator.share({ files: [file] });
         }
       } else { window.location.href = url; }
-      hint.textContent = "Caption copied. Paste it into Instagram if the caption box is empty.";
     } catch (e) {}
   });
 </script></body></html>"""
